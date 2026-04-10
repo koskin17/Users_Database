@@ -1,10 +1,12 @@
 import pathlib
+import os
+import tempfile
+import subprocess
 
 import psycopg2
 from psycopg2 import pool
 from psycopg2.pool import SimpleConnectionPool
 from dotenv import load_dotenv
-import os
 from typing import Optional
 
 from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QFileDialog, QInputDialog, QWidget, \
@@ -34,10 +36,10 @@ class MainWindow(QMainWindow):
         self.label = QLabel()
         self.label.setPixmap(QPixmap('Pictures/axor_logo.png'))
 
-        self.btn_about_users = QPushButton("Загрузить базу пользователей", self)
+        self.btn_about_users = QPushButton("Все пользователи в базе", self)
         self.btn_about_users.move(0, 175)
         self.btn_about_users.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
-        # self.btn_about_users.clicked.connect(self.check_file_with_users)
+        self.btn_about_users.clicked.connect(self.cleaning_the_user_base_from_spam)
 
         self.btn_users_by_country = QPushButton("Пользователи по странам", self)
         self.btn_users_by_country.move(0, 205)
@@ -125,7 +127,7 @@ class MainWindow(QMainWindow):
         """Execute SQL query with automatic connection management"""
         if not self.db_pool:
             print("Database pool not intialized.") #TODO delete after testing
-            return None
+            return None, None
         
         conn = None
 
@@ -140,11 +142,11 @@ class MainWindow(QMainWindow):
 
             if query.strip().upper().startswith('SELECT'):
                 results = cursor.fetchall()
-                return results
+                columns = [desc[0] for desc in cursor.description]
+                return results, columns
             else:
                 conn.commit()
-                return cursor.rowcount
-            
+                return cursor.rowcount 
         except Exception as e:
             print(f"Error executing query: {e}") #TODO delete after testing
             if conn:
@@ -155,29 +157,64 @@ class MainWindow(QMainWindow):
                 cursor.close()
                 self.db_pool.putconn(conn)
 
+    def query_to_dataframe(self, query, params=None):
+        """Run query, load results into pandas DataFrame with query column names."""
+        results, columns = self.execute_query(query, params)
+        if not results or not columns:
+            QMessageBox.warning(self, "Внимание!", "Dataframe is empty.")
+            return pd.DataFrame()
+        return pd.DataFrame(results, columns=columns)
+
+    def open_dataframe_in_excel(self, df):
+        """Open DataFrame in Excel using a temporary file."""
+
+        if df is None or df.empty:
+            QMessageBox.warning(self, "Внимание!", "DataFrane is empty.")
+            return
+        
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+                tmp_path=tmp.name
+
+            df.to_excel(tmp_path, index=False)
+
+            if os.name == "nt":
+                os.startfile(tmp_path)
+            else:
+                opener = "open" if sys.platform == "darwin" else "xdg-open"
+                subprocess.Popen([opener, tmp_path])
+        except Exception as e:
+            QMessageBox.warning(self, "Внимание!", f"Не удалось открыть файл Excel: {e}")
+
+
     def cleaning_the_user_base_from_spam(self):        
         """Clean spam (exception empty row in "Страна" and 'Клиент' as spam) and test accounts in DataFrame"""
-        data_about_users = data_about_users[(data_about_users['Страна'] != '') &
-                                            (data_about_users['Тип пользователя'] != 'Клиент')]
 
-        """List of test accounts, excludes from counting"""
-        exclude_users = ['kazah89', 'kazah1122', 'russia89', 'sanin, ''samoilov', 'axorindustry', 'kreknina',
-                            'zeykin', 'berdnikova', 'ostashenko', 'bellaruss89@gmail.com', 'skalar', 'test',
-                            'malyigor', 'ihormaly', 'axor', 'kosits']
+        exclude_users = ('kazah89', 'kazah1122', 'russia89', 'sanin', 'samoilov', 'axorindustry', 'kreknina', 'zeykin', 'berdnikova', 'ostashenko', 'bellaruss89@gmail.com', 'skalar', 'test',
+                      'malyigor', 'ihormaly', 'axor', 'kosits')
+        
+        exclude_conditions = " AND ".join([f"u.email NOT LIKE '%{user}%'" for user in exclude_users])
 
-        """Creating list of excluded accounts"""
-        exclude_list = set()
-        for email in data_about_users['E-Mail']:
-            for i in exclude_users:
-                if i in email:
-                    exclude_list.add(email)
+        # Query with filters
+        query = f"""
+        SELECT * FROM users AS u
+        JOIN countries с ON u.country_id = с.id
+        JOIN user_type ut ON u.user_type_id = ut.id
+        WHERE u.phone != ''
+            AND u.phone IS NOT NULL
+            AND ut.user_type != 'Клиент'
+            AND {exclude_conditions}
+        """
 
-        """Clean DataFrame from exclude accounts"""
-        data_about_users = data_about_users.loc[~data_about_users['E-Mail'].isin(exclude_list)]
-        df_users = data_about_users
-        countries = list(set(df_users["Страна"]))  # list of countries in DataFrame
+        df = self.query_to_dataframe(query)
 
-        QMessageBox.information(self, "Информация", "Данные по пользователям загружены.")
+        if df.empty:
+            QMessageBox.warning(self, "Внимание!", "После очистки база пустая.")
+
+        self.open_dataframe_in_excel(df)
+        QMessageBox.information(self, "Информация", "База пользователей очищена от спама")
+
+        print(df) #TODO delete after testing
 
     def users_by_country(self):
         """Formation general statistics about users by countries."""
