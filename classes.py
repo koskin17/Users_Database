@@ -36,10 +36,10 @@ class MainWindow(QMainWindow):
         self.label = QLabel()
         self.label.setPixmap(QPixmap('Pictures/axor_logo.png'))
 
-        self.btn_about_users = QPushButton("Все пользователи в базе", self)
+        self.btn_about_users = QPushButton("Все пользователи", self)
         self.btn_about_users.move(0, 175)
         self.btn_about_users.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
-        self.btn_about_users.clicked.connect(self.cleaning_the_user_base_from_spam)
+        self.btn_about_users.clicked.connect(self.all_users)
 
         self.btn_users_by_country = QPushButton("Пользователи по странам", self)
         self.btn_users_by_country.move(0, 205)
@@ -197,24 +197,38 @@ class MainWindow(QMainWindow):
 
         # Query with filters
         query = f"""
-        SELECT * FROM users AS u
-        JOIN countries с ON u.country_id = с.id
+        SELECT  u.id AS user_id,
+            u.points,
+            u.sessions_count,
+            u.login_email,
+            u.email,
+            u.first_name,
+            u.last_name,
+            u.phone,
+            u.last_login,
+            u.last_authorization,
+            u.registration_date,
+            c.country_name,
+            ut.user_type
+        FROM users AS u
+        JOIN countries c ON u.country_id = c.id
         JOIN user_type ut ON u.user_type_id = ut.id
-        WHERE u.phone != ''
-            AND u.phone IS NOT NULL
-            AND ut.user_type != 'Клиент'
-            AND {exclude_conditions}
+        WHERE u.phone IS NOT NULL
+          AND u.phone <> ''
+          AND ut.user_type <> 'Клиент'
+          AND {exclude_conditions}
         """
 
         df = self.query_to_dataframe(query)
 
         if df.empty:
             QMessageBox.warning(self, "Внимание!", "После очистки база пустая.")
+        else:
+            return df
 
-        self.open_dataframe_in_excel(df)
-        QMessageBox.information(self, "Информация", "База пользователей очищена от спама")
-
-        print(df) #TODO delete after testing
+    def all_users(self):
+        all_users = self.cleaning_the_user_base_from_spam()
+        self.open_dataframe_in_excel(all_users)
 
     def users_by_country(self):
         """Formation general statistics about users by countries."""
