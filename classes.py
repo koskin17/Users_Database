@@ -118,125 +118,29 @@ class MainWindow(QMainWindow):
             print(f"Error connecting to database: {e}") #TODO delete after testing
             self.db_pool = None
 
-    def check_file_with_users(self):
-        """Loading and check file about users and the availability necessary columns in file about users"""
-        global df_users
-        global countries
+    def cleaning_the_user_base_from_spam(self):        
+        """Clean spam (exception empty row in "Страна" and 'Клиент' as spam) and test accounts in DataFrame"""
+        data_about_users = data_about_users[(data_about_users['Страна'] != '') &
+                                            (data_about_users['Тип пользователя'] != 'Клиент')]
 
-        QMessageBox.information(self, "Важно!", "Перед загрузкой убедитесь, что файл с данными в формате .XLSX")
+        """List of test accounts, excludes from counting"""
+        exclude_users = ['kazah89', 'kazah1122', 'russia89', 'sanin, ''samoilov', 'axorindustry', 'kreknina',
+                            'zeykin', 'berdnikova', 'ostashenko', 'bellaruss89@gmail.com', 'skalar', 'test',
+                            'malyigor', 'ihormaly', 'axor', 'kosits']
 
-        file_with_users = QFileDialog.getOpenFileName(self, 'Open file', f'{Path.home() / "Desktop"}', '*.xlsx')
+        """Creating list of excluded accounts"""
+        exclude_list = set()
+        for email in data_about_users['E-Mail']:
+            for i in exclude_users:
+                if i in email:
+                    exclude_list.add(email)
 
-        if file_with_users[0] == '':
-            pass
-        else:
-            """Columns for check data about users"""
-            df_users_columns = ['ID',
-                                'Баллы',
-                                'Последняя авторизация в приложении',
-                                'Город работы',
-                                'Страна',
-                                'Тип пользователя',
-                                'Фамилия',
-                                'Имя',
-                                'Отчество',
-                                'E-Mail']
+        """Clean DataFrame from exclude accounts"""
+        data_about_users = data_about_users.loc[~data_about_users['E-Mail'].isin(exclude_list)]
+        df_users = data_about_users
+        countries = list(set(df_users["Страна"]))  # list of countries in DataFrame
 
-            data_about_users = pd.read_excel(file_with_users[0],
-                                             na_values="NA",
-                                             converters={"ID": int, "Баллы": int})
-
-            for col_name in df_users_columns:
-                if col_name not in data_about_users.columns:
-                    QMessageBox.warning(self, "Внимание!", f"В загруженных данных не хватает столбца {col_name}")
-                    return False
-                else:
-                    data_about_users = data_about_users[['ID',
-                                                         'Баллы',
-                                                         'Последняя авторизация в приложении',
-                                                         'Город работы',
-                                                         'Страна',
-                                                         'Тип пользователя',
-                                                         'Фамилия',
-                                                         'Имя',
-                                                         'Отчество',
-                                                         'E-Mail']]
-
-            data_about_users['Последняя авторизация в приложении'] = pd.to_datetime(
-                data_about_users['Последняя авторизация в приложении'],
-                format='%d.%m.%Y %H:%M:%S').dt.normalize()
-
-            data_about_users['Баллы'].fillna(0, inplace=True)
-            data_about_users.fillna('', inplace=True)
-
-            """Clean spam (exception empty row in "Страна" and 'Клиент' as spam) and test accounts in DataFrame"""
-            data_about_users = data_about_users[(data_about_users['Страна'] != '') &
-                                                (data_about_users['Тип пользователя'] != 'Клиент')]
-
-            """List of test accounts, excludes from counting"""
-            exclude_users = ['kazah89', 'kazah1122', 'russia89', 'sanin, ''samoilov', 'axorindustry', 'kreknina',
-                             'zeykin', 'berdnikova', 'ostashenko', 'bellaruss89@gmail.com', 'skalar', 'test',
-                             'malyigor', 'ihormaly', 'axor', 'kosits']
-
-            """Creating list of excluded accounts"""
-            exclude_list = set()
-            for email in data_about_users['E-Mail']:
-                for i in exclude_users:
-                    if i in email:
-                        exclude_list.add(email)
-
-            """Clean DataFrame from exclude accounts"""
-            data_about_users = data_about_users.loc[~data_about_users['E-Mail'].isin(exclude_list)]
-            df_users = data_about_users
-            countries = list(set(df_users["Страна"]))  # list of countries in DataFrame
-
-            QMessageBox.information(self, "Информация", "Данные по пользователям загружены.")
-
-    def check_file_with_scans(self):
-        """Check the availability necessary columns in file about scans"""
-        global df_scans
-
-        QMessageBox.information(self, "Важно!", "Перед загрузкой убедитесь, что файл с данными в формате .XLSX")
-
-        file_with_scans = QFileDialog.getOpenFileName(self, 'Open file', f'{Path.home() / "Desktop"}', '*.xlsx')
-
-        if file_with_scans[0] == '':
-            pass
-        else:
-            """Columns for check data about scans"""
-            df_scans_columns = ['UF_TYPE',
-                                'UF_POINTS',
-                                'Дилер+Монтажник',
-                                'UF_USER_ID',
-                                'Монтажник',
-                                'UF_CREATED_AT',
-                                'Страна',
-                                'Сам себе',
-                                'Монтажник.1']
-            data_about_scans = pd.read_excel(file_with_scans[0],
-                                             converters={"UF_POINTS": int, "UF_USER_ID": int, "Монтажник": int})
-
-            for col_name in df_scans_columns:
-                if col_name not in data_about_scans.columns:
-                    QMessageBox.warning(self, "Внимание!", f"В загруженных данных не хватает столбца {col_name}")
-                    return False
-                else:
-                    data_about_scans = data_about_scans[['UF_TYPE',
-                                                         'UF_POINTS',
-                                                         'Дилер+Монтажник',
-                                                         'UF_USER_ID',
-                                                         'Монтажник',
-                                                         'UF_CREATED_AT',
-                                                         'Страна',
-                                                         'Сам себе',
-                                                         'Монтажник.1']]
-
-            data_about_scans['UF_CREATED_AT'] = pd.to_datetime(data_about_scans['UF_CREATED_AT'],
-                                                               format='%d.%m.%Y %H:%M:%S').dt.normalize()
-            data_about_scans = data_about_scans.fillna('')
-            df_scans = data_about_scans
-
-            QMessageBox.information(self, "Информация", "Данные по сканам загружены.")
+        QMessageBox.information(self, "Информация", "Данные по пользователям загружены.")
 
     def users_by_country(self):
         """Formation general statistics about users by countries."""
