@@ -8,6 +8,8 @@ __pycache__/
 
 # History of local fils
 .history
+.vscode
+*.sql
 
 # Distribution / packaging
 .Python
