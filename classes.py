@@ -1,14 +1,16 @@
 import pathlib
 
+import psycopg2
+from psycopg2 import pool
+from dotenv import load_dotenv
+import os
+
 from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QFileDialog, QInputDialog, QWidget, \
     QVBoxLayout
 from PyQt5.QtGui import QIcon, QPixmap, QFont
-from datetime import datetime
+
 import pandas as pd
-from pathlib import Path
-import pathlib
-import os
-import subprocess
+from datetime import datetime
 
 df_users = pd.DataFrame
 countries = set()
@@ -17,6 +19,9 @@ df_scans = pd.DataFrame
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
+        load_dotenv()
+        self.db_connection()
 
         self.resize(620, 600)
         self.setWindowTitle("Данные по пользователя и сканам в приложении AXOR")
@@ -94,6 +99,24 @@ class MainWindow(QMainWindow):
         container.setLayout(layout)
 
         self.setCentralWidget(container)
+
+    def db_connection(self):
+        """Connection to database"""
+
+        try:
+            self.db_pool = psycopg2.pool.SimpleConnectionPool(
+                minconn=5,
+                maxconn=20,
+                user = os.getenv('DB_USER'),
+                password = os.getenv('DB_PASSWORD'),
+                database = os.getenv('DB_NAME'),
+                host = os.getenv('DB_HOST'),
+                port = int(os.getenv('DB_PORT', 5432)),
+            )
+            print("Connection to database established successfully.")   #TODO delete after testing
+        except Exception as e:
+            print(f"Error connecting to database: {e}") #TODO delete after testing
+            self.db_pool = None
 
     def check_file_with_users(self):
         """Loading and check file about users and the availability necessary columns in file about users"""
@@ -793,3 +816,16 @@ class MainWindow(QMainWindow):
                         f'{dir_for_output_data}/TOP_adjusters_by_scans_in_{country[0]} {datetime.now().date()}.xlsx')
                     subprocess.Popen(f'explorer /select,{dir_for_output_data},')  # вариант для открытия папки с данными
                     # os.startfile(f'{dir_for_output_data}/TOP_adjusters_by_scans_in_{country[0]} {datetime.now().date()}.xlsx') # вариант для запуска созданного файла с данными
+
+    def close_db_connection(self):
+        """ Closing connection to database """
+        if self.db_pool:
+            self.db_pool.closeall()
+            print("Connection to database closed.") #TODO удалить или заменить на логирование
+
+    def closeEvent(self, event):
+        """Handle window close event"""
+        self.close_db_connection()
+        print("Database connection terminated.") #TODO delete after testing
+        event.accept()
+    
