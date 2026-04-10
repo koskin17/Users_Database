@@ -2,8 +2,10 @@ import pathlib
 
 import psycopg2
 from psycopg2 import pool
+from psycopg2.pool import SimpleConnectionPool
 from dotenv import load_dotenv
 import os
+from typing import Optional
 
 from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QFileDialog, QInputDialog, QWidget, \
     QVBoxLayout
@@ -17,12 +19,14 @@ countries = set()
 df_scans = pd.DataFrame
 
 class MainWindow(QMainWindow):
+    db_pool: Optional[SimpleConnectionPool] = None
+
     def __init__(self):
         super().__init__()
 
         load_dotenv()
         self.db_connection()
-
+        
         self.resize(620, 600)
         self.setWindowTitle("Данные по пользователя и сканам в приложении AXOR")
         self.setWindowIcon(QIcon('Pictures/axor.ico'))
@@ -33,7 +37,7 @@ class MainWindow(QMainWindow):
         self.btn_about_users = QPushButton("Загрузить базу пользователей", self)
         self.btn_about_users.move(0, 175)
         self.btn_about_users.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
-        self.btn_about_users.clicked.connect(self.check_file_with_users)
+        # self.btn_about_users.clicked.connect(self.check_file_with_users)
 
         self.btn_users_by_country = QPushButton("Пользователи по странам", self)
         self.btn_users_by_country.move(0, 205)
@@ -55,7 +59,7 @@ class MainWindow(QMainWindow):
         self.btn_about_scans.move(0, 345)
         self.btn_about_scans.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
         self.btn_about_scans.move(0, 175)
-        self.btn_about_scans.clicked.connect(self.check_file_with_scans)
+        # self.btn_about_scans.clicked.connect(self.check_file_with_scans)
 
         self.btn_data_about_scan_users_in_current_year = QPushButton(
             "Кол-во сканировавших пользователей в текущем году на данный момент", self)
@@ -102,9 +106,8 @@ class MainWindow(QMainWindow):
 
     def db_connection(self):
         """Connection to database"""
-
         try:
-            self.db_pool = psycopg2.pool.SimpleConnectionPool(
+            self.db_pool = SimpleConnectionPool(
                 minconn=5,
                 maxconn=20,
                 user = os.getenv('DB_USER'),
@@ -117,6 +120,40 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Error connecting to database: {e}") #TODO delete after testing
             self.db_pool = None
+
+    def execute_query(self, query, params=None):
+        """Execute SQL query with automatic connection management"""
+        if not self.db_pool:
+            print("Database pool not intialized.") #TODO delete after testing
+            return None
+        
+        conn = None
+
+        try:
+            conn = self.db_pool.getconn()
+            cursor = conn.cursor()
+
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+
+            if query.strip().upper().startswith('SELECT'):
+                results = cursor.fetchall()
+                return results
+            else:
+                conn.commit()
+                return cursor.rowcount
+            
+        except Exception as e:
+            print(f"Error executing query: {e}") #TODO delete after testing
+            if conn:
+                conn.rollback()
+            return None
+        finally:
+            if conn:
+                cursor.close()
+                self.db_pool.putconn(conn)
 
     def cleaning_the_user_base_from_spam(self):        
         """Clean spam (exception empty row in "Страна" and 'Клиент' as spam) and test accounts in DataFrame"""
