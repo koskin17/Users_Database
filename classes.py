@@ -14,14 +14,6 @@ df_users = pd.DataFrame
 countries = set()
 df_scans = pd.DataFrame
 
-try:
-    Path.mkdir(pathlib.Path.cwd() / 'Данные по пользователям и сканам')
-except FileExistsError:
-    pass
-
-dir_for_output_data = Path(pathlib.Path.cwd(), 'Данные по пользователям и сканам')
-
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
