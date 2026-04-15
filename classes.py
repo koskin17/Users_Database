@@ -208,10 +208,12 @@ class MainWindow(QMainWindow):
             u.last_authorization,
             u.registration_date,
             c.country_name,
-            ut.user_type
+            ut.user_type,
+            spk_name
         FROM users AS u
-        JOIN countries c ON u.country_id = c.id
-        JOIN user_type ut ON u.user_type_id = ut.id
+        JOIN countries AS c ON u.country_id = c.id
+        JOIN user_type AS ut ON u.user_type_id = ut.id
+        JOIN spk AS spk ON u.spk_id = spk.id
         WHERE u.phone IS NOT NULL
           AND u.phone <> ''
           AND ut.user_type <> 'Клиент'
