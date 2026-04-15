@@ -36,16 +36,16 @@ class MainWindow(QMainWindow):
         self.label = QLabel()
         self.label.setPixmap(QPixmap('Pictures/axor_logo.png'))
 
-        self.btn_about_users = QPushButton("Все пользователи", self)
+        self.btn_about_users = QPushButton("All users", self)
         self.btn_about_users.move(0, 175)
         self.btn_about_users.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
         self.btn_about_users.clicked.connect(self.all_users)
 
-        self.btn_users_by_country = QPushButton("Пользователи по странам", self)
+        self.btn_users_by_country = QPushButton("Users by country", self)
         self.btn_users_by_country.move(0, 205)
         self.btn_users_by_country.clicked.connect(self.users_by_country)
 
-        self.btn_last_authorization_in_app = QPushButton("Авторизация пользователей в приложении", self)
+        self.btn_last_authorization_in_app = QPushButton("Last user's authorization in the application", self)
         self.btn_last_authorization_in_app.move(0, 235)
         self.btn_last_authorization_in_app.clicked.connect(self.last_authorization_in_app)
 
@@ -149,10 +149,10 @@ class MainWindow(QMainWindow):
                 conn.commit()
                 return cursor.rowcount 
         except Exception as e:
-            print(f"Error executing query: {e}") #TODO delete after testing
+            QMessageBox.warning(self, f"Error executing query: {e}") # type: ignore
             if conn:
                 conn.rollback()
-            return None
+            return None, None
         finally:
             if conn:
                 cursor.close()
@@ -172,7 +172,7 @@ class MainWindow(QMainWindow):
         """Open DataFrame in Excel using a temporary file."""
 
         if df is None or df.empty:
-            QMessageBox.warning(self, "Внимание!", "DataFrane is empty.")
+            QMessageBox.warning(self, "Attention!", "DataFrame is empty.")
             return
         
         try:
@@ -187,10 +187,10 @@ class MainWindow(QMainWindow):
                 opener = "open" if sys.platform == "darwin" else "xdg-open"
                 subprocess.Popen([opener, tmp_path])
         except Exception as e:
-            QMessageBox.warning(self, "Внимание!", f"Не удалось открыть файл Excel: {e}")
+            QMessageBox.warning(self, "Attention!", f"Unable to open Excel file: {e}")
 
-    def cleaning_the_user_base_from_spam(self):        
-        """Clean spam (exception empty row in "Страна" and 'Клиент' as spam) and test accounts in DataFrame"""
+    def load_and_clean_users(self):        
+        """Clean spam and test accounts in DataFrame"""
 
         exclude_users = ('kazah89', 'kazah1122', 'russia89', 'sanin', 'samoilov', 'axorindustry', 'kreknina', 'zeykin', 'berdnikova', 'ostashenko', 'bellaruss89@gmail.com', 'skalar', 'test',
                       'malyigor', 'ihormaly', 'axor', 'kosits')
@@ -226,56 +226,53 @@ class MainWindow(QMainWindow):
         df = self.query_to_dataframe(query)
 
         if df.empty:
-            QMessageBox.warning(self, "Внимание!", "После очистки база пустая.")
+            QMessageBox.warning(self, "Attention!", "After cleaning the database is empty!")
+            return pd.DataFrame()
         else:
+            self.df_users = df
             return df
 
     def all_users(self):
         """Getting information about all users in the database"""
-        all_users = self.cleaning_the_user_base_from_spam()
+        all_users = self.load_and_clean_users()
         self.open_dataframe_in_excel(all_users)
 
     def users_by_country(self):
         """General statistics about users by countries."""
 
-        df = self.cleaning_the_user_base_from_spam()
-        users_by_countries = df.groupby(["country_name", "user_type"]).size().reset_index(name='count')
+        df = self.load_and_clean_users()
+        if df.empty: # type: ignore
+            QMessageBox.warning(self, "Attention! Database is empty!") # type: ignore
+        else:
+            users_by_countries = df.groupby(["country_name", "user_type"]).size().reset_index(name='count')
+        
         self.open_dataframe_in_excel(users_by_countries)
 
     def last_authorization_in_app(self):
-        """Quantity of authorized users by years with group by согтекн and type of user"""
+        """Quantity of authorized users by years with group by country and type of user"""
 
-        query = """
-            SELECT 
-                c.country_name,
-                ut.user_type,
-                EXTRACT(YEAR FROM u.last_authorization) AS year,
-                COUNT(u.id) AS user_count
-            FROM users AS u
-            JOIN countries c ON u.country_id = c.id
-            JOIN user_type ut ON u.user_type_id = ut.id
-            WHERE u.last_authorization IS NOT NULL
-            GROUP BY c.country_name, ut.user_type, year
-            ORDER BY c.country_name, ut.user_type, year;
-        """
-        df = self.cleaning_the_user_base_from_spam()
-
-        df = self.query_to_dataframe(query)
+        df: pd.DataFrame = self.load_and_clean_users()
 
         if df.empty:
-            QMessageBox.warning(self, "Attention!", "Dataframe is empty.")
+            QMessageBox.warning(self, "Attention!", "Database is empty!")
             return
+        
+        df["Year"] = df["last_authorization"].dt.year.fillna(0).astype(int)
 
-        # Converting years to columns
-        pivot_df = df.pivot_table(
-            index=["country_name", "user_type"],
-            columns="year",
-            values="user_count",
-            fill_value=0
+        df_grouped = (
+            df[df["Year"] != 0].groupby(["country_name", "user_type", "Year"]).size().reset_index(name="user_count")
+        )
+
+        pivot_df = df_grouped.pivot_table(
+            index = ["country_name", "user_type"],
+            columns = "Year",
+            values = "user_count",
+            fill_value = 0
         ).reset_index()
 
         self.open_dataframe_in_excel(pivot_df)
-        QMessageBox.information(self, "Information", "User authorization data has been generated.") #TODO delete after testing
+        QMessageBox.information(self, "Attention!", "Data on the number of authorized users has been generated.")
+
 
     def authorization_during_period(self):
         """ information about the amount of authorized users for the period """
