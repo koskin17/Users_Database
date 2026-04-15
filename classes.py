@@ -324,67 +324,6 @@ class MainWindow(QMainWindow):
         self.open_dataframe_in_excel(grouped)
         QMessageBox.information(self, "Information.", "Information on the number of authorized users for the period has been generated.")
 
-        # start = start_date.strftime("%d-%m-%Y")
-        # end = end_date.strftime("%d-%m-%Y")
-        # file
-
-        # end_date = datetime(1900, 1, 1)
-
-        # def period_data(start_period_of_authorisation: datetime, end_period_of_authorization: datetime, user_type: str,
-        #                 authorization_in_country: str):
-        #     """ Counting the amount of users authorized in App during period """
-
-        #     data = df_users[(df_users['Тип пользователя'] == user_type) &
-        #                     (df_users['Страна'] == authorization_in_country) &
-        #                     (df_users['Последняя авторизация в приложении'] >= start_period_of_authorisation) &
-        #                     (df_users['Последняя авторизация в приложении'] <= end_period_of_authorization)]
-
-        #     return len(data['ID'])
-
-        # if df_users.empty:
-        #     QMessageBox.warning(self, "Внимание!", "Загрузите данные по пользователям.")
-        # else:
-        #     start_date, btn = QInputDialog.getText(self, "Начало периода",
-        #                                            "Укажите начало периода в формате mm.dd.yyyy (через точку): ")
-        #     if btn:
-        #         try:
-        #             start_date = datetime.strptime(start_date, '%d.%m.%Y')
-        #             end_date, btn = QInputDialog.getText(self, "Конец периода",
-        #                                                  "Укажите конец периода в формате mm.dd.yyyy (через точку): ")
-        #             if btn:
-        #                 try:
-        #                     end_date = datetime.strptime(end_date, '%d.%m.%Y')
-        #                 except ValueError:
-        #                     QMessageBox.warning(self, "Внимание!", "Конечная дата введена неверно!")
-        #         except TypeError or ValueError:
-        #             QMessageBox.warning(self, "Внимание!", "Начальная дата введена неверно!")
-        #             # TODO разобраться с исключениями
-        #             pass
-
-        #         total_amount = 0
-        #         authorization_during_period_list = []
-        #         for country in countries:
-        #             amount_of_dealers = period_data(start_date, end_date, 'Дилер', country)
-        #             authorization_during_period_list.append([country, 'Дилеры', amount_of_dealers])
-        #             total_amount += amount_of_dealers
-        #             amount_of_adjusters = period_data(start_date, end_date, 'Монтажник', country)
-        #             authorization_during_period_list.append([country, 'Монтажники', amount_of_adjusters])
-        #             total_amount += amount_of_adjusters
-        #             authorization_during_period_list.append(['', '', ''])
-
-        #         authorization_during_period_list.append(['Всего:', '', total_amount])
-
-        #         columns = ['Страна', 'Тип пользователей', 'Авторизовалось пользователей']
-        #         index = [_ for _ in range(len(authorization_during_period_list))]
-        #         authorization_during_period_df = pd.DataFrame(authorization_during_period_list, index, columns)
-
-        #         start = datetime.strftime(start_date, "%d-%m-%Y")
-        #         end = datetime.strftime(end_date, "%d-%m-%Y")
-
-        #         authorization_during_period_df.to_excel(
-        #             f'{dir_for_output_data}/authorization_during_period {start}-{end}.xlsx')
-        #         subprocess.Popen(f'explorer /select,{dir_for_output_data},')
-
     def points_by_users_and_countries(self):
         """ Information about points by users and countries """
 
