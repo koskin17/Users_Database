@@ -118,15 +118,16 @@ class MainWindow(QMainWindow):
                 host = os.getenv('DB_HOST'),
                 port = int(os.getenv('DB_PORT', 5432)),
             )
-            print("Connection to database established successfully.")   #TODO delete after testing
+            QMessageBox.information(self, "Information", "Connection to the database has been established.")
         except Exception as e:
-            print(f"Error connecting to database: {e}") #TODO delete after testing
+            QMessageBox.warning(self, "Attention!", "Error connecting to database: {e}")
             self.db_pool = None
 
     def execute_query(self, query, params=None):
         """Execute SQL query with automatic connection management"""
+
         if not self.db_pool:
-            print("Database pool not intialized.") #TODO delete after testing
+            QMessageBox.warning(self, "Attention!", "Database pool not intialized.")
             return None, None
         
         conn = None
@@ -159,9 +160,11 @@ class MainWindow(QMainWindow):
 
     def query_to_dataframe(self, query, params=None):
         """Run query, load results into pandas DataFrame with query column names."""
+
         results, columns = self.execute_query(query, params) # type: ignore
+
         if not results or not columns:
-            QMessageBox.warning(self, "Внимание!", "Dataframe is empty.")
+            QMessageBox.warning(self, "Attention!", "Dataframe is empty.")
             return pd.DataFrame()
         return pd.DataFrame(results, columns=columns)
 
@@ -234,69 +237,45 @@ class MainWindow(QMainWindow):
 
     def users_by_country(self):
         """General statistics about users by countries."""
+
         df = self.cleaning_the_user_base_from_spam()
         users_by_countries = df.groupby(["country_name", "user_type"]).size().reset_index(name='count')
         self.open_dataframe_in_excel(users_by_countries)
 
     def last_authorization_in_app(self):
-        """ Information about last authorisation users in app by years"""
+        """Quantity of authorized users by years with group by согтекн and type of user"""
 
-        def amount_users_by_type(country_for_amount_users: str, user_type: str):
-            """ Count amount users in country. """
+        query = """
+            SELECT 
+                c.country_name,
+                ut.user_type,
+                EXTRACT(YEAR FROM u.last_authorization) AS year,
+                COUNT(u.id) AS user_count
+            FROM users AS u
+            JOIN countries c ON u.country_id = c.id
+            JOIN user_type ut ON u.user_type_id = ut.id
+            WHERE u.last_authorization IS NOT NULL
+            GROUP BY c.country_name, ut.user_type, year
+            ORDER BY c.country_name, ut.user_type, year;
+        """
+        df = self.cleaning_the_user_base_from_spam()
 
-            data = df_users[(df_users["Страна"] == country_for_amount_users) &
-                            (df_users["Тип пользователя"] == user_type)]
+        df = self.query_to_dataframe(query)
 
-            return len(data["ID"])
+        if df.empty:
+            QMessageBox.warning(self, "Attention!", "Dataframe is empty.")
+            return
 
-        def last_authorization(year: int, user_type: str, country_for_last_authorization: str):
-            """Counting quantity of users with last authorisation in specific year."""
+        # Converting years to columns
+        pivot_df = df.pivot_table(
+            index=["country_name", "user_type"],
+            columns="year",
+            values="user_count",
+            fill_value=0
+        ).reset_index()
 
-            if year == 0:
-                data = df_users[
-                    (df_users['Year'] == 0) &
-                    (df_users['Тип пользователя'] == user_type) &
-                    (df_users['Страна'] == country_for_last_authorization)]
-
-                last = len(data["ID"])
-            else:
-                data = df_users[(df_users['Year'] == year) &
-                                (df_users["Тип пользователя"] == user_type) &
-                                (df_users["Страна"] == country_for_last_authorization)]
-
-                last = len(data["ID"])
-
-            return last
-
-        if df_users.empty:
-            QMessageBox.warning(self, "Внимание!", "Загрузите данные по пользователям.")
-        else:
-            df_users['Year'] = df_users['Последняя авторизация в приложении'].dt.year
-            df_users['Year'].fillna(0, inplace=True)
-            years = sorted([year for year in set(df_users['Year']) if year != 0])
-            last_authorization_in_app_list = []
-
-            for country in countries:
-                last_authorization_in_app_list.append([country, 'Дилеры', amount_users_by_type(country, 'Дилер')] +
-                                                      [last_authorization(year, 'Дилер', country) for year in years] +
-                                                      [last_authorization(0, 'Дилер', country)])
-
-            last_authorization_in_app_list.append(['', '', '', '', '', '', '', '', ])
-
-            for country in countries:
-                last_authorization_in_app_list.append(
-                    [country, 'Монтажники', amount_users_by_type(country, 'Монтажник')] +
-                    [last_authorization(year, 'Монтажник', country) for year in years] +
-                    [last_authorization(0, 'Монтажник', country)])
-
-            columns = ['Страна', 'Тип пользователей', 'Всего в базе'] + [year for year in years] + ['Не авторизовались']
-            index = [_ for _ in range(len(last_authorization_in_app_list))]
-            last_authorization_in_app_df = pd.DataFrame(last_authorization_in_app_list, index, columns)
-
-            last_authorization_in_app_df.to_excel(
-                f'{dir_for_output_data}/last_authorization_in_app {datetime.now().date()}.xlsx')
-            subprocess.Popen(f'explorer /select,{dir_for_output_data},')  # вариант для открытия папки с данными
-            # os.startfile(f'{dir_for_output_data}/last_authorization_in_app {datetime.now().date()}.xlsx') # вариант для запуска созданного файла с данными
+        self.open_dataframe_in_excel(pivot_df)
+        QMessageBox.information(self, "Information", "User authorization data has been generated.") #TODO delete after testing
 
     def authorization_during_period(self):
         """ information about the amount of authorized users for the period """
