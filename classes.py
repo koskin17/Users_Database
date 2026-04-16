@@ -319,42 +319,6 @@ class MainWindow(QMainWindow):
         self.open_dataframe_in_excel(grouped)
         QMessageBox.information(self, "Information", "Data about the current sum of points by type of users and countries has been generated.")
 
-
-
-
-
-        # def sum_of_points(type_of_user: str, country_for_sum_points: str):
-        #     """ Count point of users by country"""
-
-        #     data = df_users[(df_users['Тип пользователя'] == type_of_user) &
-        #                     (df_users['Страна'] == country_for_sum_points)]
-
-        #     return sum(data['Баллы'])
-
-        # if df_users.empty:
-        #     QMessageBox.warning(self, "Внимание!", "Загрузите данные по пользователям.")
-        # else:
-        #     points_by_users_and_countries_list = []
-        #     for country in countries:
-        #         total_points = 0
-        #         points = sum_of_points('Дилер', country)
-        #         points_by_users_and_countries_list.append([country, 'Дилеры', points])
-        #         total_points += points
-        #         points = sum_of_points('Монтажник', country)
-        #         points_by_users_and_countries_list.append([country, 'Монтажники', points])
-        #         total_points += points
-        #         points_by_users_and_countries_list.append(['Всего баллов:', '', total_points])
-        #         points_by_users_and_countries_list.append(['', '', ''])
-
-        #     columns = ['Страна', 'Тип пользователей', 'Сумма баллов']
-        #     index = [_ for _ in range(len(points_by_users_and_countries_list))]
-        #     points_by_users_and_countries_df = pd.DataFrame(points_by_users_and_countries_list, index, columns)
-
-        #     points_by_users_and_countries_df.to_excel(
-        #         f"{dir_for_output_data}/points_by_users_and_countries {datetime.now().date()}.xlsx")
-        #     subprocess.Popen(f'explorer /select,{dir_for_output_data},')  # вариант для открытия папки с данными
-        #     # os.startfile(f'{dir_for_output_data}/points_by_users_and_countries {datetime.now().date()}.xlsx') # вариант для запуска созданного файла с данными
-
     def data_about_scan_users_in_current_year(self):
         """ Information about scanned users in current year """
         global countries
