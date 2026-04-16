@@ -16,10 +16,6 @@ from PyQt5.QtGui import QIcon, QPixmap, QFont
 import pandas as pd
 from datetime import datetime
 
-# df_users = pd.DataFrame #TODO delete after testing
-# countries = set() #TODO delete after testing
-# df_scans = pd.DataFrame   #TODO delete after testing
-
 class MainWindow(QMainWindow):
     db_pool: Optional[SimpleConnectionPool] = None
 
