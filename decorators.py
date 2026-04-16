@@ -29,3 +29,29 @@ def for_data_about_users(func):
         return result
     
     return wrapper
+
+def for_data_about_scans(func):
+    """Decorator for loading data about scans"""
+
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        df: pd.DataFrame = self.load_data_about_scans()
+        
+        if df.empty:
+            QMessageBox.warning(self, "Warning!", "Database about scans is empty.")
+            return
+        try:
+            sig = inspect.signature(func)
+            accepts_var_pos = any(p.kind == p.VAR_POSITIONAL for p in sig.parameters.values())
+            if accepts_var_pos:
+                result = func(self, df, *args, **kwargs)
+            else:
+                result = func(self, df, **kwargs)
+        finally:
+            del df
+            gc.collect()
+            print("Daframe is deleted") #TODO delete after cleaning
+        
+        return result
+    
+    return wrapper

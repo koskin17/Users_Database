@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QInpu
     QVBoxLayout
 from PyQt5.QtGui import QIcon, QPixmap, QFont
 
-from decorators import for_data_about_users
+from decorators import for_data_about_users, for_data_about_scans
 
 class MainWindow(QMainWindow):
     db_pool: Optional[SimpleConnectionPool] = None
@@ -52,11 +52,11 @@ class MainWindow(QMainWindow):
         self.btn_points_by_users_and_countries.move(0, 295)
         self.btn_points_by_users_and_countries.clicked.connect(self.points_by_users_and_countries)
 
-        self.btn_about_scans = QPushButton("Загрузить базу сканирований", self)
+        self.btn_about_scans = QPushButton("All scans", self)
         self.btn_about_scans.move(0, 345)
         self.btn_about_scans.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
         self.btn_about_scans.move(0, 175)
-        # self.btn_about_scans.clicked.connect(self.check_file_with_scans)
+        self.btn_about_scans.clicked.connect(self.all_scans)
 
         self.btn_data_about_scan_users_in_current_year = QPushButton(
             "Кол-во сканировавших пользователей в текущем году на данный момент", self)
@@ -192,9 +192,8 @@ class MainWindow(QMainWindow):
         
         exclude_conditions = " AND ".join([f"u.email NOT LIKE '%{user}%'" for user in exclude_users])
 
-        # Query with filters
         query = f"""
-        SELECT  u.id AS user_id,
+        SELECT u.id AS user_id,
             u.points,
             u.sessions_count,
             u.login_email,
@@ -220,12 +219,19 @@ class MainWindow(QMainWindow):
 
         df = self.query_to_dataframe(query)
 
-        if df.empty:
-            QMessageBox.warning(self, "Attention!", "After cleaning the database is empty!")
-            return pd.DataFrame()
-        else:
-            self.df_users = df
-            return df
+        self.df_users = df
+        return df
+    
+    def load_data_about_scans(self):
+        """Loading data about scans by all users"""
+
+        query = f"""
+        SELECT * FROM scan_history
+        """
+
+        df = self.query_to_dataframe(query)
+        self.df_scans = df
+        return df
 
     @for_data_about_users
     def all_users(self, df):
@@ -318,6 +324,10 @@ class MainWindow(QMainWindow):
 
         self.open_dataframe_in_excel(grouped)
         QMessageBox.information(self, "Information", "Data about the current sum of points by type of users and countries has been generated.")
+
+    @for_data_about_scans
+    def all_scans(self, df):
+        self.open_dataframe_in_excel(df)
 
     def data_about_scan_users_in_current_year(self):
         """ Information about scanned users in current year """
