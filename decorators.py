@@ -24,7 +24,7 @@ def for_data_about_users(func):
         finally:
             del df
             gc.collect()
-            print("Daframe is deleted") #TODO delete after cleaning
+            print("DataFrame is deleted") #TODO delete after cleaning
         
         return result
     
@@ -50,7 +50,7 @@ def for_data_about_scans(func):
         finally:
             del df
             gc.collect()
-            print("Daframe is deleted") #TODO delete after cleaning
+            print("DataFrame is deleted") #TODO delete after cleaning
         
         return result
     

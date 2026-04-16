@@ -733,6 +733,5 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         """Handle window close event"""
         self.close_db_connection()
-        print("Database connection terminated.") #TODO delete after testing
         event.accept()
     
