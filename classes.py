@@ -1,20 +1,19 @@
 import pathlib
-import os
-import tempfile
-import subprocess
+import os, tempfile, subprocess
 
-import psycopg2
+import pandas as pd
+from datetime import datetime
+
 from psycopg2 import pool
 from psycopg2.pool import SimpleConnectionPool
 from dotenv import load_dotenv
 from typing import Optional
 
-from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QFileDialog, QInputDialog, QWidget, \
+from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QInputDialog, QWidget, \
     QVBoxLayout
 from PyQt5.QtGui import QIcon, QPixmap, QFont
 
-import pandas as pd
-from datetime import datetime
+from decorators import for_data_about_users
 
 class MainWindow(QMainWindow):
     db_pool: Optional[SimpleConnectionPool] = None
@@ -228,26 +227,21 @@ class MainWindow(QMainWindow):
             self.df_users = df
             return df
 
-    def all_users(self):
+    @for_data_about_users
+    def all_users(self, df):
         """Getting information about all users in the database"""
-        all_users = self.load_and_clean_users()
-        self.open_dataframe_in_excel(all_users)
+        self.open_dataframe_in_excel(df)
 
-    def users_by_country(self):
+    @for_data_about_users
+    def users_by_country(self, df):
         """General statistics about users by countries."""
 
-        df = self.load_and_clean_users()
-        if df.empty: # type: ignore
-            QMessageBox.warning(self, "Attention! Database is empty!") # type: ignore
-        else:
-            users_by_countries = df.groupby(["country_name", "user_type"]).size().reset_index(name='count')
-        
+        users_by_countries = df.groupby(["country_name", "user_type"]).size().reset_index(name='count')
         self.open_dataframe_in_excel(users_by_countries)
 
-    def last_authorization_in_app(self):
+    @for_data_about_users
+    def last_authorization_in_app(self, df):
         """Quantity of authorized users by years with group by country and type of user"""
-
-        df: pd.DataFrame = self.load_and_clean_users()
 
         if df.empty:
             QMessageBox.warning(self, "Attention!", "Database is empty!")
@@ -269,10 +263,9 @@ class MainWindow(QMainWindow):
         self.open_dataframe_in_excel(pivot_df)
         QMessageBox.information(self, "Information.", "Data on the number of authorized users has been generated.")
 
-    def authorization_during_period(self):
+    @for_data_about_users
+    def authorization_during_period(self, df):
         """ Information about the amount of authorized users for the period """
-
-        df = self.load_and_clean_users()
 
         if df.empty:
             QMessageBox.warning(self, "Attention!", "Database is empty!")
@@ -320,6 +313,7 @@ class MainWindow(QMainWindow):
         self.open_dataframe_in_excel(grouped)
         QMessageBox.information(self, "Information.", "Information on the number of authorized users for the period has been generated.")
 
+    @for_data_about_users
     def points_by_users_and_countries(self):
         """ Information about points by users and countries """
 
