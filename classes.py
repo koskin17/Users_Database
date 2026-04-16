@@ -242,10 +242,6 @@ class MainWindow(QMainWindow):
     @for_data_about_users
     def last_authorization_in_app(self, df):
         """Quantity of authorized users by years with group by country and type of user"""
-
-        if df.empty:
-            QMessageBox.warning(self, "Attention!", "Database is empty!")
-            return
         
         df["Year"] = df["last_authorization"].dt.year.fillna(0).astype(int)
 
@@ -266,9 +262,6 @@ class MainWindow(QMainWindow):
     @for_data_about_users
     def authorization_during_period(self, df):
         """ Information about the amount of authorized users for the period """
-
-        if df.empty:
-            QMessageBox.warning(self, "Attention!", "Database is empty!")
 
         start_date_str, ok = QInputDialog.getText(self, "Beginning of the period:", "Specify the beginning of the period in the format dd.mm.yyyy (separated by a dot):")
         start_date = datetime.strptime(start_date_str, "%d.%m.%Y")
@@ -314,40 +307,53 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Information.", "Information on the number of authorized users for the period has been generated.")
 
     @for_data_about_users
-    def points_by_users_and_countries(self):
-        """ Information about points by users and countries """
+    def points_by_users_and_countries(self, df):
+        """ Information about current sum of points by users and countries """
+    
+        grouped = (df.groupby(["country_name", "user_type"])["points"].sum().reset_index(name="sum_points"))
 
-        def sum_of_points(type_of_user: str, country_for_sum_points: str):
-            """ Count point of users by country"""
+        total_points = grouped["sum_points"].sum()
+        total_row = pd.DataFrame([["Total:", "", total_points]], columns = grouped.columns)
+        grouped = pd.concat([grouped, total_row], ignore_index=True)
 
-            data = df_users[(df_users['Тип пользователя'] == type_of_user) &
-                            (df_users['Страна'] == country_for_sum_points)]
+        self.open_dataframe_in_excel(grouped)
+        QMessageBox.information(self, "Information", "Data about the current sum of points by type of users and countries has been generated.")
 
-            return sum(data['Баллы'])
 
-        if df_users.empty:
-            QMessageBox.warning(self, "Внимание!", "Загрузите данные по пользователям.")
-        else:
-            points_by_users_and_countries_list = []
-            for country in countries:
-                total_points = 0
-                points = sum_of_points('Дилер', country)
-                points_by_users_and_countries_list.append([country, 'Дилеры', points])
-                total_points += points
-                points = sum_of_points('Монтажник', country)
-                points_by_users_and_countries_list.append([country, 'Монтажники', points])
-                total_points += points
-                points_by_users_and_countries_list.append(['Всего баллов:', '', total_points])
-                points_by_users_and_countries_list.append(['', '', ''])
 
-            columns = ['Страна', 'Тип пользователей', 'Сумма баллов']
-            index = [_ for _ in range(len(points_by_users_and_countries_list))]
-            points_by_users_and_countries_df = pd.DataFrame(points_by_users_and_countries_list, index, columns)
 
-            points_by_users_and_countries_df.to_excel(
-                f"{dir_for_output_data}/points_by_users_and_countries {datetime.now().date()}.xlsx")
-            subprocess.Popen(f'explorer /select,{dir_for_output_data},')  # вариант для открытия папки с данными
-            # os.startfile(f'{dir_for_output_data}/points_by_users_and_countries {datetime.now().date()}.xlsx') # вариант для запуска созданного файла с данными
+
+        # def sum_of_points(type_of_user: str, country_for_sum_points: str):
+        #     """ Count point of users by country"""
+
+        #     data = df_users[(df_users['Тип пользователя'] == type_of_user) &
+        #                     (df_users['Страна'] == country_for_sum_points)]
+
+        #     return sum(data['Баллы'])
+
+        # if df_users.empty:
+        #     QMessageBox.warning(self, "Внимание!", "Загрузите данные по пользователям.")
+        # else:
+        #     points_by_users_and_countries_list = []
+        #     for country in countries:
+        #         total_points = 0
+        #         points = sum_of_points('Дилер', country)
+        #         points_by_users_and_countries_list.append([country, 'Дилеры', points])
+        #         total_points += points
+        #         points = sum_of_points('Монтажник', country)
+        #         points_by_users_and_countries_list.append([country, 'Монтажники', points])
+        #         total_points += points
+        #         points_by_users_and_countries_list.append(['Всего баллов:', '', total_points])
+        #         points_by_users_and_countries_list.append(['', '', ''])
+
+        #     columns = ['Страна', 'Тип пользователей', 'Сумма баллов']
+        #     index = [_ for _ in range(len(points_by_users_and_countries_list))]
+        #     points_by_users_and_countries_df = pd.DataFrame(points_by_users_and_countries_list, index, columns)
+
+        #     points_by_users_and_countries_df.to_excel(
+        #         f"{dir_for_output_data}/points_by_users_and_countries {datetime.now().date()}.xlsx")
+        #     subprocess.Popen(f'explorer /select,{dir_for_output_data},')  # вариант для открытия папки с данными
+        #     # os.startfile(f'{dir_for_output_data}/points_by_users_and_countries {datetime.now().date()}.xlsx') # вариант для запуска созданного файла с данными
 
     def data_about_scan_users_in_current_year(self):
         """ Information about scanned users in current year """

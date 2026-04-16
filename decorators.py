@@ -1,5 +1,6 @@
 import gc
 import pandas as pd
+import inspect
 from functools import wraps
 from PyQt5.QtWidgets import QMessageBox
 
@@ -12,14 +13,19 @@ def for_data_about_users(func):
         
         if df.empty:
             QMessageBox.warning(self, "Warning!", "After cleaninf database is empty.")
-
+            return
         try:
-            results = func(self, df, *args, **kwargs)
+            sig = inspect.signature(func)
+            accepts_var_pos = any(p.kind == p.VAR_POSITIONAL for p in sig.parameters.values())
+            if accepts_var_pos:
+                result = func(self, df, *args, **kwargs)
+            else:
+                result = func(self, df, **kwargs)
         finally:
             del df
             gc.collect()
             print("Daframe is deleted") #TODO delete after cleaning
-
-        return results
+        
+        return result
     
     return wrapper
