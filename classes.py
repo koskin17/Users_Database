@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
         self.btn_data_about_scan_users_in_current_year = QPushButton(
             "Scanned users by year", self)
         self.btn_data_about_scan_users_in_current_year.move(0, 375)
-        self.btn_data_about_scan_users_in_current_year.clicked.connect(self.Scanned_users_by_year)
+        self.btn_data_about_scan_users_in_current_year.clicked.connect(self.scanned_users_by_year)
 
         self.btn_data_about_points = QPushButton("Насканировано баллов в текущем году на данный момент",
                                                  self)
@@ -345,7 +345,7 @@ class MainWindow(QMainWindow):
     def all_scans(self, df):
         self.open_dataframe_in_excel(df)
 
-    def Scanned_users_by_year(self, df):
+    def scanned_users_by_year(self, df):
         """Information about the number of scanning users by year, country, and user type"""
 
         query_dealer_scanned_for_himself = f"""
