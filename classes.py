@@ -1,5 +1,6 @@
 import pathlib
 import os, tempfile, subprocess
+import gc
 
 import pandas as pd
 from datetime import datetime
@@ -59,9 +60,9 @@ class MainWindow(QMainWindow):
         self.btn_about_scans.clicked.connect(self.all_scans)
 
         self.btn_data_about_scan_users_in_current_year = QPushButton(
-            "Кол-во сканировавших пользователей в текущем году на данный момент", self)
+            "Scanned users by year", self)
         self.btn_data_about_scan_users_in_current_year.move(0, 375)
-        self.btn_data_about_scan_users_in_current_year.clicked.connect(self.data_about_scan_users_in_current_year)
+        self.btn_data_about_scan_users_in_current_year.clicked.connect(self.Scanned_users_by_year)
 
         self.btn_data_about_points = QPushButton("Насканировано баллов в текущем году на данный момент",
                                                  self)
@@ -144,7 +145,7 @@ class MainWindow(QMainWindow):
                 conn.commit()
                 return cursor.rowcount 
         except Exception as e:
-            QMessageBox.warning(self, f"Error executing query: {e}") # type: ignore
+            QMessageBox.warning(self, "Attention!", f"Error executing query: {e}") # type: ignore
             if conn:
                 conn.rollback()
             return None, None
@@ -225,8 +226,23 @@ class MainWindow(QMainWindow):
     def load_data_about_scans(self):
         """Loading data about scans by all users"""
 
-        query = f"""
-        SELECT * FROM scan_history
+        query = """
+        SELECT sh.id,
+                sh.user_id,
+                sh.installer_id,
+                pr.product,
+                sh.points,
+                sh.qr_code,
+                sh.created_at,
+                c.country_name,
+                ut.user_type,
+                companies.company_name
+        FROM scan_history AS sh
+        JOIN users AS u ON sh.user_id = u.id
+        JOIN products AS pr ON sh.product_id = pr.id
+        JOIN countries AS c ON u.country_id = c.id
+        JOIN user_type AS ut ON u.user_type_id = ut.id
+        JOIN companies ON sh.company_id = companies.id
         """
 
         df = self.query_to_dataframe(query)
@@ -329,64 +345,106 @@ class MainWindow(QMainWindow):
     def all_scans(self, df):
         self.open_dataframe_in_excel(df)
 
-    def data_about_scan_users_in_current_year(self):
-        """ Information about scanned users in current year """
-        global countries
+    def Scanned_users_by_year(self, df):
+        """Information about the number of scanning users by year, country, and user type"""
 
-        def scanned_users(country_for_scanned_users: str, user_type: str, himself=True):
-            """ Count amount of users scanned in current year"""
+        query_dealer_scanned_for_himself = f"""
+        SELECT c.country_name, ut.user_type,
+                EXTRACT(YEAR FROM sh.created_at) AS year,
+                COUNT(DISTINCT sh.user_id) AS dealer_count
+        FROM scan_history AS sh
+        JOIN users AS u ON sh.user_id = u.id
+        JOIN countries AS c ON u.country_id = c.id
+        JOIN user_type AS ut ON u.user_type_id = ut.id
+        WHERE sh.installer_id IS NULL
+            AND ut.id = 1
+        GROUP BY c.country_name, ut.user_type, year
+        ORDER BY c.country_name, ut.user_type, year;
+        """
+        
+        df_dealer_scanned_for_himself = self.query_to_dataframe(query_dealer_scanned_for_himself)
 
-            count = set()
+        pivot_df = (
+            df_dealer_scanned_for_himself.pivot_table(
+                index=["country_name", "user_type"],
+                columns="year",
+                values="dealer_count",
+                fill_value=0
+            ).reset_index()
+        )
 
-            if himself:
-                if user_type == 'Дилер':
-                    data = df_scans[(df_scans['Страна'] == country_for_scanned_users) &
-                                    (df_scans['Сам себе'] == user_type) &
-                                    (df_scans['Монтажник.1'] == '')]
+        self.open_dataframe_in_excel(pivot_df)
 
-                    count = set(data['UF_USER_ID'])
+        QMessageBox.information(self, "Information", "Statistics on scanning users by year have been compiled.")
 
-                elif user_type == 'Монтажник':
-                    data = df_scans[(df_scans['Страна'] == country_for_scanned_users) &
-                                    (df_scans['Сам себе'] == 'Монтажник')]
+        del df_dealer_scanned_for_himself, pivot_df
+        gc.collect()
+        print("DataFrame is deleted") #TODO delete after cleaning
 
-                    count = set(data['UF_USER_ID'])
+        query_installer_scanned_for_himself = f"""
+        SELECT c.country_name, ut.user_type,
+                EXTRACT(YEAR FROM sh.created_at) AS year,
+                COUNT(DISTINCT sh.user_id) AS dealer_count
+        FROM scan_history AS sh
+        JOIN users AS u ON sh.user_id = u.id
+        JOIN countries AS c ON u.country_id = c.id
+        JOIN user_type AS ut ON u.user_type_id = ut.id
+        WHERE sh.installer_id IS NULL
+            AND ut.id = 2
+        GROUP BY c.country_name, ut.user_type, year
+        ORDER BY c.country_name, ut.user_type, year;
+        """
+        
+        query_installer_scanned_for_himself = self.query_to_dataframe(query_installer_scanned_for_himself)
 
-            else:
-                data = df_scans[(df_scans['Страна'] == country_for_scanned_users) &
-                                (df_scans['Монтажник.1'] == 'Монтажник')]
+        pivot_df = (
+            query_installer_scanned_for_himself.pivot_table(
+                index=["country_name", "user_type"],
+                columns="year",
+                values="dealer_count",
+                fill_value=0
+            ).reset_index()
+        )
 
-                count = set(data['Монтажник'])
+        self.open_dataframe_in_excel(pivot_df)
 
-            return len(count)
+        QMessageBox.information(self, "Information", "Statistics on scanning users by year have been compiled.")
 
-        if df_scans.empty:
-            QMessageBox.warning(self, "Внимание!", "Загрузите данные по сканам.")
-        else:
-            countries = list(set(df_scans["Страна"]))  # list of countries in DataFrame
-            table_about_scan_users_in_year_list = []
-            for country in countries:
-                dealers_himself = scanned_users(country, 'Дилер')
-                adjusters_himself = scanned_users(country, 'Монтажник')
-                adjusters_for_dealers = scanned_users(country, 'Монтажник', False)
-                table_about_scan_users_in_year_list.append([country, 'Дилеры', 'Сами себе', dealers_himself])
-                table_about_scan_users_in_year_list.append(['', 'Монтажники', 'Сами себе', adjusters_himself])
-                table_about_scan_users_in_year_list.append(
-                    ['', 'Монтажники', 'Сканировали дилеру', adjusters_for_dealers])
-                table_about_scan_users_in_year_list.append(['', '', 'Итого:',
-                                                            dealers_himself +
-                                                            adjusters_himself +
-                                                            adjusters_for_dealers])
-                table_about_scan_users_in_year_list.append(['', '', '', ''])
+        del query_installer_scanned_for_himself, pivot_df
+        gc.collect()
+        print("DataFrame is deleted") #TODO delete after cleaning
 
-            columns = ['Страна', 'Тип пользователей', 'Сканировали', 'Кол-во пользователей']
-            index = [_ for _ in range(len(table_about_scan_users_in_year_list))]
-            table_about_scan_users_in_year_df = pd.DataFrame(table_about_scan_users_in_year_list, index, columns)
+        query_installer_scanned_for_dealer = f"""
+        SELECT c.country_name, ut.user_type,
+                EXTRACT(YEAR FROM sh.created_at) AS year,
+                COUNT(DISTINCT sh.user_id) AS dealer_count
+        FROM scan_history AS sh
+        JOIN users AS u ON sh.user_id = u.id
+        JOIN countries AS c ON u.country_id = c.id
+        JOIN user_type AS ut ON u.user_type_id = ut.id
+        WHERE sh.installer_id IS NOT NULL
+        GROUP BY c.country_name, ut.user_type, year
+        ORDER BY c.country_name, ut.user_type, year;
+        """
+        
+        query_installer_scanned_for_dealer = self.query_to_dataframe(query_installer_scanned_for_dealer)
 
-            table_about_scan_users_in_year_df.to_excel(
-                f'{dir_for_output_data}/scanned_users_in_year {datetime.now().date()}.xlsx')
-            subprocess.Popen(f'explorer /select,{dir_for_output_data},')  # вариант для открытия папки с данными
-            # os.startfile(f'{dir_for_output_data}/scanned_users_in_year {datetime.now().date()}.xlsx') # вариант для запуска созданного файла с данными
+        pivot_df = (
+            query_installer_scanned_for_dealer.pivot_table(
+                index=["country_name", "user_type"],
+                columns="year",
+                values="dealer_count",
+                fill_value=0
+            ).reset_index()
+        )
+
+        self.open_dataframe_in_excel(pivot_df)
+
+        QMessageBox.information(self, "Information", "Statistics on scanning users by year have been compiled.")
+
+        del query_installer_scanned_for_dealer, pivot_df
+        gc.collect()
+        print("DataFrame is deleted") #TODO delete after cleaning
 
     def data_about_points(self):
         """ Information about sum of points scanned in current year """
