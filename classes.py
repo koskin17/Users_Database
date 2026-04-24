@@ -64,24 +64,10 @@ class MainWindow(QMainWindow):
         self.btn_data_about_scan_users_in_current_year.move(0, 375)
         self.btn_data_about_scan_users_in_current_year.clicked.connect(self.scanned_users_by_year)
 
-        self.btn_data_about_points = QPushButton("Насканировано баллов в текущем году на данный момент",
-                                                 self)
-        self.btn_data_about_points.move(0, 405)
-        self.btn_data_about_points.clicked.connect(self.data_about_points)
-
-        self.btn_scanned_users_by_months = QPushButton("Кол-во сканировавших пользователей в текущем году по месяцам",
-                                                       self)
-        self.btn_scanned_users_by_months.move(0, 435)
-        self.btn_scanned_users_by_months.clicked.connect(self.scanned_users_by_months)
-
         self.btn_data_about_scans_during_period = QPushButton("Кол-во пользователей и насканированных баллов за период",
                                                               self)
         self.btn_data_about_scans_during_period.move(0, 465)
         self.btn_data_about_scans_during_period.clicked.connect(self.data_about_scans_during_period)
-
-        self.btn_top_users_by_scans = QPushButton("ТОП пользователей по сканам в текущем году на данный момент", self)
-        self.btn_top_users_by_scans.move(0, 495)
-        self.btn_top_users_by_scans.clicked.connect(self.top_users_by_scans)
 
         layout = QVBoxLayout()
         layout.addWidget(self.label)
@@ -92,10 +78,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.btn_points_by_users_and_countries)
         layout.addWidget(self.btn_about_scans)
         layout.addWidget(self.btn_data_about_scan_users_in_current_year)
-        layout.addWidget(self.btn_data_about_points)
-        layout.addWidget(self.btn_scanned_users_by_months)
         layout.addWidget(self.btn_data_about_scans_during_period)
-        layout.addWidget(self.btn_top_users_by_scans)
 
         container = QWidget()
         container.setLayout(layout)
@@ -423,127 +406,6 @@ class MainWindow(QMainWindow):
         del df_scanned_users_by_year, df_scanned_users_by_year_pivot_df
         gc.collect()
         print("All dataFrame are deleted") #TODO delete after cleaning
-
-    def data_about_points(self):
-        """ Information about sum of points scanned in current year """
-        global countries
-
-        def total_amount_of_points_for_year(country_for_points, user_type):
-            """Count the sum of points scanned in current year"""
-
-            amount_of_points = 0
-
-            if user_type == 'Дилер':
-                data = df_scans[(df_scans['Страна'] == country_for_points) &
-                                (df_scans['Сам себе'] == user_type)]
-
-                amount_of_points = sum(data['UF_POINTS'])
-
-            elif user_type == 'Монтажник':
-                data = df_scans[(df_scans['Страна'] == country_for_points) &
-                                (df_scans['Сам себе'] == user_type)]
-
-                amount_of_points = sum(data['UF_POINTS'])
-
-                data = df_scans[(df_scans['Страна'] == country_for_points) &
-                                (df_scans['Монтажник.1'] == 'Монтажник')]
-
-                amount_of_points += sum(data['UF_POINTS'])
-
-            return amount_of_points
-
-        if df_scans.empty:
-            QMessageBox.warning(self, "Внимание!", "Загрузите данные по сканам.")
-        else:
-            countries = list(set(df_scans["Страна"]))  # list of countries in DataFrame
-            """ Output data about points """
-            data_about_points_lst = []
-            for country in countries:
-                point_of_dealers = total_amount_of_points_for_year(country, 'Дилер')
-                points_of_adjusters = total_amount_of_points_for_year(country, 'Монтажник')
-                data_about_points_lst.append([country, 'Дилеры', point_of_dealers])
-                data_about_points_lst.append(['', 'Монтажники', points_of_adjusters])
-                data_about_points_lst.append(['', 'Итого:', point_of_dealers + points_of_adjusters])
-                data_about_points_lst.append(['', '', ''])
-
-            columns = ['Страна', 'Тип пользователей', 'Насканировано баллов']
-            index = [_ for _ in range(len(data_about_points_lst))]
-            data_about_points_df = pd.DataFrame(data_about_points_lst, index, columns)
-
-            data_about_points_df.to_excel(
-                f'{dir_for_output_data}/all_points_of_users_by_country {datetime.now().date()}.xlsx')
-            subprocess.Popen(f'explorer /select,{dir_for_output_data},')  # вариант для открытия папки с данными
-            # os.startfile(f'{dir_for_output_data}/all_points_of_users_by_country {datetime.now().date()}.xlsx') # вариант для запуска созданного файла с данными
-
-    def scanned_users_by_months(self):
-        """ Information about scanned users by country in each month """
-        global countries
-
-        if df_scans.empty:
-            QMessageBox.warning(self, "Внимание!", "Загрузите данные по сканам.")
-        else:
-            months = {1: 'Январь',
-                      2: 'Февраль',
-                      3: 'Март',
-                      4: 'Апрель',
-                      5: 'Май',
-                      6: 'Июнь',
-                      7: 'Июль',
-                      8: 'Август',
-                      9: 'Сентябрь',
-                      10: 'Октябрь',
-                      11: 'Ноябрь',
-                      12: 'Декабрь'}
-            countries = list(set(df_scans["Страна"]))  # list of countries in DataFrame
-            df_scans['Месяц'] = df_scans['UF_CREATED_AT'].dt.month.map(months)
-
-            scanned_users_by_months_list = []
-            columns = ['Страна', 'Тип пользователей', 'Сканировали'] + [month for month in months.values()]
-
-            for country in countries:
-                dealers_himself = [country, 'Дилеры', 'Сами себе']
-                adjusters_himself = ['', 'Монтажники', 'Сами себе']
-                adjusters_for_dealers = ['', 'Монтажники', 'Сканировали дилеру']
-                total_users_in_country = ['', '', 'Итого:']
-
-                for month in months.values():
-                    data = df_scans[(df_scans['Страна'] == country) &
-                                    (df_scans['Месяц'] == month) &
-                                    (df_scans['Сам себе'] == 'Дилер') &
-                                    (df_scans['Монтажник.1'] == '')]
-
-                    d_h = len(set(data['UF_USER_ID']))  # dealers himself
-                    dealers_himself.append(d_h)
-
-                    data = df_scans[(df_scans['Месяц'] == month) &
-                                    (df_scans['Страна'] == country) &
-                                    (df_scans['Сам себе'] == 'Монтажник')]
-
-                    a_h = len(set(data['UF_USER_ID']))  # adjusters himself
-                    adjusters_himself.append(a_h)
-
-                    data = df_scans[(df_scans['Месяц'] == month) &
-                                    (df_scans['Страна'] == country) &
-                                    (df_scans['Монтажник.1'] == 'Монтажник')]
-
-                    a_d = len(set(data['Монтажник']))  # adjusters for dealers
-                    adjusters_for_dealers.append(a_d)
-
-                    total_users_in_country.append(d_h + a_h + a_d)
-
-                scanned_users_by_months_list.append(dealers_himself)
-                scanned_users_by_months_list.append(adjusters_himself)
-                scanned_users_by_months_list.append(adjusters_for_dealers)
-                scanned_users_by_months_list.append(total_users_in_country)
-                scanned_users_by_months_list.append(['', '', ''])
-
-            index = [_ for _ in range(len(scanned_users_by_months_list))]
-            scanned_users_by_months_df = pd.DataFrame(scanned_users_by_months_list, index, columns)
-
-            scanned_users_by_months_df.to_excel(
-                f'{dir_for_output_data}/scanned_users_by_months {datetime.now().date()}.xlsx')
-            subprocess.Popen(f'explorer /select,{dir_for_output_data},')  # вариант для открытия папки с данными
-            # os.startfile(f'{dir_for_output_data}/scanned_users_by_months {datetime.now().date()}.xlsx') # вариант для запуска созданного файла с данными
 
     def data_about_scans_during_period(self):
         """Output information about users and scans during period"""
