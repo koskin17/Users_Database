@@ -12,7 +12,7 @@ def for_data_about_users(func):
         df: pd.DataFrame = self.load_and_clean_users()
         
         if df.empty:
-            QMessageBox.warning(self, "Warning!", "After cleanung database is empty.")
+            QMessageBox.warning(self, "Warning!", "After cleaning database is empty.")
             return
         try:
             sig = inspect.signature(func)

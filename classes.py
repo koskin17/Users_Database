@@ -8,8 +8,7 @@ from psycopg2.pool import SimpleConnectionPool
 from dotenv import load_dotenv
 from typing import Optional
 
-from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QInputDialog, QWidget, \
-    QVBoxLayout
+from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QInputDialog, QWidget, QVBoxLayout
 from PyQt5.QtGui import QIcon, QPixmap, QFont
 
 from decorators import for_data_about_users, for_data_about_scans
@@ -108,7 +107,7 @@ class MainWindow(QMainWindow):
         """Execute SQL query with automatic connection management"""
 
         if not self.db_pool:
-            QMessageBox.warning(self, "Attention!", "Database pool not intialized.")
+            QMessageBox.warning(self, "Attention!", "Database pool not initialized.")
             return None, None
         
         conn = None
@@ -289,7 +288,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period  is incorrect!")
             return
         
-        end_date_str, ok = QInputDialog.getText(self, "End of a petiod:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
+        end_date_str, ok = QInputDialog.getText(self, "End of a period:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
 
         if not ok or not end_date_str:
             return        
@@ -386,6 +385,10 @@ class MainWindow(QMainWindow):
         """
         df_scanned_users_by_year = self.query_to_dataframe(query_scanned_users_by_year)
 
+        if df_scanned_users_by_year is None or df_scanned_users_by_year.empty:
+            QMessageBox.warning(self, "Attention!", "No scan data is available.")
+            return
+
         df_scanned_users_by_year_pivot_df = (
             df_scanned_users_by_year.pivot_table(
                 index=["country_name", "user_type"],
@@ -407,7 +410,7 @@ class MainWindow(QMainWindow):
     def data_about_scans_during_period(self, df):
         """Data about number of users and scans during period"""
 
-        start_date_str, ok = QInputDialog.getText(self, "Perido start", "Enter the period start in dd.mm.yyyy (separated by dot):")
+        start_date_str, ok = QInputDialog.getText(self, "Period start", "Enter the period start in dd.mm.yyyy (separated by dot):")
 
         if not ok or not start_date_str:
             return
