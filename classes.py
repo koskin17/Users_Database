@@ -1,4 +1,4 @@
-import os, tempfile, subprocess
+import os, tempfile, subprocess, sys
 import gc
 
 import pandas as pd
@@ -54,7 +54,6 @@ class MainWindow(QMainWindow):
         self.btn_about_scans = QPushButton("All scans", self)
         self.btn_about_scans.move(0, 345)
         self.btn_about_scans.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
-        self.btn_about_scans.move(0, 175)
         self.btn_about_scans.clicked.connect(self.all_scans)
 
         self.btn_data_about_scan_users_in_current_year = QPushButton(
@@ -102,7 +101,7 @@ class MainWindow(QMainWindow):
             )
             QMessageBox.information(self, "Information", "Connection to the database has been established.")
         except Exception as e:
-            QMessageBox.warning(self, "Attention!", "Error connecting to database: {e}")
+            QMessageBox.warning(self, "Attention!", f"Error connecting to database: {e}")
             self.db_pool = None
 
     def execute_query(self, query, params=None):
@@ -287,7 +286,7 @@ class MainWindow(QMainWindow):
             print(start_date)  # TODO delete after testing
             print("Date correct")  # TODO delete after testing
         except ValueError:
-            QMessageBox.warning(self, "Attention!", "The entered date of the begging of period  is incorrect!")
+            QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period  is incorrect!")
             return
         
         end_date_str, ok = QInputDialog.getText(self, "End of a petiod:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
@@ -299,7 +298,7 @@ class MainWindow(QMainWindow):
             end_date = datetime.strptime(end_date_str, "%d.%m.%Y")
             print(end_date)   # TODO delete after testing
             print("Date correct")  # TODO delete after testing
-        except:
+        except ValueError:
             QMessageBox.warning(self, "Attention!", "The entered date of the end of period is incorrect!")
             return
 
@@ -331,7 +330,7 @@ class MainWindow(QMainWindow):
     def all_scans(self, df):
         self.open_dataframe_in_excel(df)
 
-    def scanned_users_by_year(self, df):
+    def scanned_users_by_year(self):
         """Information about the number of scanning users by year, country, and user type"""
 
         query_scanned_users_by_year = """
@@ -408,7 +407,7 @@ class MainWindow(QMainWindow):
     def data_about_scans_during_period(self, df):
         """Data about number of users and scans during period"""
 
-        start_date_str, ok = QInputDialog.getText(self, "Perido start", "Enter the period start id dd.mm.yyyy (separated by dot):")
+        start_date_str, ok = QInputDialog.getText(self, "Perido start", "Enter the period start in dd.mm.yyyy (separated by dot):")
 
         if not ok or not start_date_str:
             return
@@ -416,10 +415,10 @@ class MainWindow(QMainWindow):
         try:
             start_date = datetime.strptime(start_date_str, "%d.%m.%Y")
         except ValueError:
-            QMessageBox.warning(self, "Attention!", "The entered date of the begging of period  is incorrect!")
+            QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period  is incorrect!")
             return
         
-        end_date_str, ok = QInputDialog.getText(self, "End of period", "Enter the end of the period in dd.mm.yyyy (separatedby dot):")
+        end_date_str, ok = QInputDialog.getText(self, "End of period", "Enter the end of the period in dd.mm.yyyy (separated by dot):")
 
         if not ok or not end_date_str:
             return
