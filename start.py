@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QFont
-from classes import *
+from classes import MainWindow
 import sys
 
 

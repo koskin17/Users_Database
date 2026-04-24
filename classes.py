@@ -30,43 +30,34 @@ class MainWindow(QMainWindow):
         self.label.setPixmap(QPixmap('Pictures/axor_logo.png'))
 
         self.btn_about_users = QPushButton("All users", self)
-        self.btn_about_users.move(0, 175)
         self.btn_about_users.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
         self.btn_about_users.clicked.connect(self.all_users)
 
         self.btn_users_by_country = QPushButton("Users by country", self)
-        self.btn_users_by_country.move(0, 205)
         self.btn_users_by_country.clicked.connect(self.users_by_country)
 
         self.btn_last_authorization_in_app = QPushButton("Last user's authorization in the application", self)
-        self.btn_last_authorization_in_app.move(0, 235)
         self.btn_last_authorization_in_app.clicked.connect(self.last_authorization_in_app)
 
         self.btn_authorization_in_period = QPushButton("User authorization for the period", self)
-        self.btn_authorization_in_period.move(0, 265)
         self.btn_authorization_in_period.clicked.connect(self.authorization_during_period)
 
         self.btn_points_by_users_and_countries = QPushButton("Current number of points of users", self)
-        self.btn_points_by_users_and_countries.move(0, 295)
         self.btn_points_by_users_and_countries.clicked.connect(self.points_by_users_and_countries)
 
         self.btn_about_scans = QPushButton("All scans", self)
-        self.btn_about_scans.move(0, 345)
         self.btn_about_scans.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
         self.btn_about_scans.clicked.connect(self.all_scans)
 
         self.btn_data_about_scan_users_in_current_year = QPushButton(
             "Scanned users by year", self)
-        self.btn_data_about_scan_users_in_current_year.move(0, 375)
         self.btn_data_about_scan_users_in_current_year.clicked.connect(self.scanned_users_by_year)
 
         self.btn_data_about_scans_during_period = QPushButton("Кол-во пользователей и насканированных баллов за период",
                                                               self)
-        self.btn_data_about_scans_during_period.move(0, 465)
         self.btn_data_about_scans_during_period.clicked.connect(self.data_about_scans_during_period)
 
         self.btn_top_users_by_scans = QPushButton("TOP users by total points", self)
-        self.btn_top_users_by_scans.move(0, 495)
         self.btn_top_users_by_scans.clicked.connect(self.top_users_by_scans)
 
         layout = QVBoxLayout()
@@ -127,9 +118,9 @@ class MainWindow(QMainWindow):
                 return results, columns
             else:
                 conn.commit()
-                return cursor.rowcount 
+                return cursor.rowcount, None
         except Exception as e:
-            QMessageBox.warning(self, "Attention!", f"Error executing query: {e}") # type: ignore
+            QMessageBox.warning(self, "Attention!", f"Error executing query: {e}")
             if conn:
                 conn.rollback()
             return None, None
@@ -144,7 +135,7 @@ class MainWindow(QMainWindow):
         results, columns = self.execute_query(query, params) # type: ignore
 
         if not results or not columns:
-            QMessageBox.warning(self, "Attention!", "Dataframe is empty.")
+            QMessageBox.information(self, "Information", "DataFrame is empty.")
             return pd.DataFrame()
         return pd.DataFrame(results, columns=columns)
 
@@ -195,7 +186,7 @@ class MainWindow(QMainWindow):
         FROM users AS u
         JOIN countries AS c ON u.country_id = c.id
         JOIN user_type AS ut ON u.user_type_id = ut.id
-        JOIN spk AS spk ON u.spk_id = spk.id
+        LEFT JOIN spk AS spk ON u.spk_id = spk.id
         WHERE u.phone IS NOT NULL
           AND u.phone <> ''
           AND ut.user_type <> 'Клиент'
@@ -285,7 +276,7 @@ class MainWindow(QMainWindow):
             print(start_date)  # TODO delete after testing
             print("Date correct")  # TODO delete after testing
         except ValueError:
-            QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period  is incorrect!")
+            QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period is incorrect!")
             return
         
         end_date_str, ok = QInputDialog.getText(self, "End of a period:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
@@ -370,7 +361,7 @@ class MainWindow(QMainWindow):
 
                 -- Installer scanned for dealers
                 SELECT
-                    sh.user_id AS user_identifier,
+                    sh.installer_id AS user_identifier,
                     installer_country.country_name,
                     installer_ut.user_type,
                     sh.created_at
@@ -418,7 +409,7 @@ class MainWindow(QMainWindow):
         try:
             start_date = datetime.strptime(start_date_str, "%d.%m.%Y")
         except ValueError:
-            QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period  is incorrect!")
+            QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period is incorrect!")
             return
         
         end_date_str, ok = QInputDialog.getText(self, "End of period", "Enter the end of the period in dd.mm.yyyy (separated by dot):")
