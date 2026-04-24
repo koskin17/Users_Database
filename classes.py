@@ -69,6 +69,10 @@ class MainWindow(QMainWindow):
         self.btn_data_about_scans_during_period.move(0, 465)
         self.btn_data_about_scans_during_period.clicked.connect(self.data_about_scans_during_period)
 
+        self.btn_top_users_by_scans = QPushButton("TOP users by total points", self)
+        self.btn_top_users_by_scans.move(0, 495)
+        self.btn_top_users_by_scans.clicked.connect(self.top_users_by_scans)
+
         layout = QVBoxLayout()
         layout.addWidget(self.label)
         layout.addWidget(self.btn_about_users)
@@ -79,6 +83,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.btn_about_scans)
         layout.addWidget(self.btn_data_about_scan_users_in_current_year)
         layout.addWidget(self.btn_data_about_scans_during_period)
+        layout.addWidget(self.btn_top_users_by_scans)
 
         container = QWidget()
         container.setLayout(layout)
@@ -275,33 +280,27 @@ class MainWindow(QMainWindow):
         """ Information about the amount of authorized users for the period """
 
         start_date_str, ok = QInputDialog.getText(self, "Beginning of the period:", "Specify the beginning of the period in the format dd.mm.yyyy (separated by a dot):")
-        start_date = datetime.strptime(start_date_str, "%d.%m.%Y")
-        print(start_date)
-        print("Start_date is correct")
 
-        if not ok:
-            return
-        
-        end_date_str, ok = QInputDialog.getText(self, "End of a petiod:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
-        end_date = datetime.strptime(end_date_str, "%d.%m.%Y")
-        print(end_date)
-        print("End_date is correct")
-
-        if not ok:
+        if not ok or not start_date_str:
             return
 
         try:
             start_date = datetime.strptime(start_date_str, "%d.%m.%Y")
-            print(start_date)
-            print("Date correct")
-        except:
+            print(start_date)  # TODO delete after testing
+            print("Date correct")  # TODO delete after testing
+        except ValueError:
             QMessageBox.warning(self, "Attention!", "The entered date of the begging of period  is incorrect!")
             return
         
+        end_date_str, ok = QInputDialog.getText(self, "End of a petiod:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
+
+        if not ok or not end_date_str:
+            return        
+        
         try:    
             end_date = datetime.strptime(end_date_str, "%d.%m.%Y")
-            print(end_date)
-            print("Date correct")
+            print(end_date)   # TODO delete after testing
+            print("Date correct")  # TODO delete after testing
         except:
             QMessageBox.warning(self, "Attention!", "The entered date of the end of period is incorrect!")
             return
@@ -534,93 +533,146 @@ class MainWindow(QMainWindow):
 
     def top_users_by_scans(self):
         """ TOP dealers / adjusters by scans"""
-        global countries
 
-        if df_users.empty:
-            QMessageBox.warning(self, "Внимание!", "Загрузите данные по пользователям.")
-        elif df_scans.empty:
-            QMessageBox.warning(self, "Внимание!", "Загрузите данные по сканам.")
-        else:
-            countries = list(set(df_scans["Страна"]))  # list of countries in DataFrame
-            users = ['Дилер', 'Монтажник']
-            country = QInputDialog.getItem(self, "Страны", "Выберите страну...", countries, editable=False)
-            if country[1]:
-                user_type = QInputDialog.getItem(self, "Пользователи", "Выберите тип пользователей...", users,
-                                                 editable=False)
+        top_users_by_scans_query = """
+            SELECT
+                combined.user_id,
+                combined.last_name,
+                combined.user_type,
+                combined.country,
+                COUNT (*) AS scans_count,
+                SUM (combined.points) AS total_points
+            FROM (
+                SELECT
+                    sh.user_id,
+                    sh.points,
+                    ut.user_type,
+                    u.last_name,
+                    c.country_name AS country
+                FROM scan_history AS sh
 
-                top_users = {}  # dictionary for TOP users by points
-                top_users_by_scans_lst = []
-                surname = {}  # dictionary for surnames
+                -- Dealers and installer scanned for himself
+                JOIN users AS u ON sh.user_id = u.id
+                JOIN countries AS c ON u.country_id = c.id
+                JOIN user_type AS ut ON u.user_type_id = ut.id
+                WHERE installer_id IS NULL
 
-                """ Filling the dictionary of surnames"""
-                for df_users_ID, df_users_surname in zip(df_users['ID'], df_users['Фамилия']):
-                    surname[df_users_ID] = df_users_surname
+                UNION ALL
 
-                if user_type[0] == 'Дилер':
-                    data = df_scans[(df_scans['Страна'] == country[0]) &
-                                    (df_scans['Сам себе'] == user_type[0])]
+                -- Installer scanned for dealer
+                SELECT
+                    sh.installer_id AS user_id,
+                    sh.points,
+                    installer_ut.user_type,
+                    installer.last_name,
+                    installer_country.country_name AS country
+                FROM scan_history AS sh
+                JOIN users AS installer ON sh.installer_id = installer.id
+                JOIN user_type AS installer_ut ON installer.user_type_id = installer_ut.id
+                JOIN countries AS installer_country ON installer.country_id = installer_country.id
+                WHERE sh.installer_id IS NOT NULL
+                ) AS combined
+                GROUP BY combined.country, combined.user_type, combined.user_id, combined.last_name
+                ORDER BY total_points DESC, scans_count DESC  
+            """
+        
+        df_top_users = self.query_to_dataframe(top_users_by_scans_query)
 
-                    for df_scans_dealer_id, df_scans_points in zip(data['UF_USER_ID'], data['UF_POINTS']):
-                        if df_scans_dealer_id in top_users.keys():
-                            top_users[df_scans_dealer_id] += df_scans_points
-                        else:
-                            top_users[df_scans_dealer_id] = df_scans_points
+        self.open_dataframe_in_excel(df_top_users)
 
-                    for df_scans_dealer_id in top_users.keys():
-                        if df_scans_dealer_id in surname.keys():  # users with empty "Страна" don't count in df_users
-                            top_users_by_scans_lst.append([df_scans_dealer_id,
-                                                           surname[df_scans_dealer_id],
-                                                           top_users[df_scans_dealer_id]])
+        QMessageBox.information(self, "Information", "Information about TOP users have been compiled.")
 
-                    top_users_by_scans_lst = sorted(top_users_by_scans_lst, key=lambda x: x[2], reverse=True)
+        del df_top_users
+        gc.collect()
+        print("All dataFrame are deleted") #TODO delete after cleaning
 
-                    top_users_by_scans_lst.append(['Итого:', '', sum(top_users.values())])
+        # global countries
 
-                    columns = ['ID пользователя', 'Фамилия', 'Сумма насканированных баллов']
-                    index = [_ for _ in range(len(top_users_by_scans_lst))]
-                    top_users_by_scans_list_df = pd.DataFrame(top_users_by_scans_lst, index, columns)
+        # if df_users.empty:
+        #     QMessageBox.warning(self, "Внимание!", "Загрузите данные по пользователям.")
+        # elif df_scans.empty:
+        #     QMessageBox.warning(self, "Внимание!", "Загрузите данные по сканам.")
+        # else:
+        #     countries = list(set(df_scans["Страна"]))  # list of countries in DataFrame
+        #     users = ['Дилер', 'Монтажник']
+        #     country = QInputDialog.getItem(self, "Страны", "Выберите страну...", countries, editable=False)
+        #     if country[1]:
+        #         user_type = QInputDialog.getItem(self, "Пользователи", "Выберите тип пользователей...", users,
+        #                                          editable=False)
 
-                    top_users_by_scans_list_df.to_excel(
-                        f'{dir_for_output_data}/TOP_dealers_by_scans_in_{country[0]} {datetime.now().date()}.xlsx')
-                    subprocess.Popen(f'explorer /select,{dir_for_output_data},')  # вариант для открытия папки с данными
-                    # os.startfile(f'{dir_for_output_data}/TOP_dealers_by_scans_in_{country[0]} {datetime.now().date()}.xlsx') # вариант для запуска созданного файла с данными
-                elif user_type[0] == 'Монтажник':
-                    data = df_scans[(df_scans['Страна'] == country[0]) &
-                                    (df_scans['Сам себе'] == user_type[0])]
+        #         top_users = {}  # dictionary for TOP users by points
+        #         top_users_by_scans_lst = []
+        #         surname = {}  # dictionary for surnames
 
-                    for df_scans_adjuster_id, df_scans_point in zip(data['UF_USER_ID'], data['UF_POINTS']):
-                        if df_scans_adjuster_id in top_users.keys():
-                            top_users[df_scans_adjuster_id] += df_scans_point
-                        else:
-                            top_users[df_scans_adjuster_id] = df_scans_point
+        #         """ Filling the dictionary of surnames"""
+        #         for df_users_ID, df_users_surname in zip(df_users['ID'], df_users['Фамилия']):
+        #             surname[df_users_ID] = df_users_surname
 
-                    data = df_scans[(df_scans['Страна'] == country[0]) &
-                                    (df_scans['Монтажник.1'] == user_type[0])]
+        #         if user_type[0] == 'Дилер':
+        #             data = df_scans[(df_scans['Страна'] == country[0]) &
+        #                             (df_scans['Сам себе'] == user_type[0])]
 
-                    for df_scans_adjuster_id, df_scans_point in zip(data['Монтажник'], data['UF_POINTS']):
-                        if df_scans_adjuster_id in top_users.keys():
-                            top_users[df_scans_adjuster_id] += df_scans_point
-                        else:
-                            top_users[df_scans_adjuster_id] = df_scans_point
+        #             for df_scans_dealer_id, df_scans_points in zip(data['UF_USER_ID'], data['UF_POINTS']):
+        #                 if df_scans_dealer_id in top_users.keys():
+        #                     top_users[df_scans_dealer_id] += df_scans_points
+        #                 else:
+        #                     top_users[df_scans_dealer_id] = df_scans_points
 
-                    for df_scans_adjuster_id in top_users.keys():
-                        if df_scans_adjuster_id in surname.keys():  # users with empty "Страна" don't count in df_users
-                            top_users_by_scans_lst.append([df_scans_adjuster_id,
-                                                           surname[df_scans_adjuster_id],
-                                                           top_users[df_scans_adjuster_id]])
+        #             for df_scans_dealer_id in top_users.keys():
+        #                 if df_scans_dealer_id in surname.keys():  # users with empty "Страна" don't count in df_users
+        #                     top_users_by_scans_lst.append([df_scans_dealer_id,
+        #                                                    surname[df_scans_dealer_id],
+        #                                                    top_users[df_scans_dealer_id]])
 
-                    top_users_by_scans_lst = sorted(top_users_by_scans_lst, key=lambda x: x[2], reverse=True)
+        #             top_users_by_scans_lst = sorted(top_users_by_scans_lst, key=lambda x: x[2], reverse=True)
 
-                    top_users_by_scans_lst.append(['Итого:', '', sum(top_users.values())])
+        #             top_users_by_scans_lst.append(['Итого:', '', sum(top_users.values())])
 
-                    columns = ['ID пользователя', 'Фамилия', 'Сумма насканированных баллов']
-                    index = [_ for _ in range(len(top_users_by_scans_lst))]
-                    top_users_by_scans_list_df = pd.DataFrame(top_users_by_scans_lst, index, columns)
+        #             columns = ['ID пользователя', 'Фамилия', 'Сумма насканированных баллов']
+        #             index = [_ for _ in range(len(top_users_by_scans_lst))]
+        #             top_users_by_scans_list_df = pd.DataFrame(top_users_by_scans_lst, index, columns)
 
-                    top_users_by_scans_list_df.to_excel(
-                        f'{dir_for_output_data}/TOP_adjusters_by_scans_in_{country[0]} {datetime.now().date()}.xlsx')
-                    subprocess.Popen(f'explorer /select,{dir_for_output_data},')  # вариант для открытия папки с данными
-                    # os.startfile(f'{dir_for_output_data}/TOP_adjusters_by_scans_in_{country[0]} {datetime.now().date()}.xlsx') # вариант для запуска созданного файла с данными
+        #             top_users_by_scans_list_df.to_excel(
+        #                 f'{dir_for_output_data}/TOP_dealers_by_scans_in_{country[0]} {datetime.now().date()}.xlsx')
+        #             subprocess.Popen(f'explorer /select,{dir_for_output_data},')  # вариант для открытия папки с данными
+        #             # os.startfile(f'{dir_for_output_data}/TOP_dealers_by_scans_in_{country[0]} {datetime.now().date()}.xlsx') # вариант для запуска созданного файла с данными
+        #         elif user_type[0] == 'Монтажник':
+        #             data = df_scans[(df_scans['Страна'] == country[0]) &
+        #                             (df_scans['Сам себе'] == user_type[0])]
+
+        #             for df_scans_adjuster_id, df_scans_point in zip(data['UF_USER_ID'], data['UF_POINTS']):
+        #                 if df_scans_adjuster_id in top_users.keys():
+        #                     top_users[df_scans_adjuster_id] += df_scans_point
+        #                 else:
+        #                     top_users[df_scans_adjuster_id] = df_scans_point
+
+        #             data = df_scans[(df_scans['Страна'] == country[0]) &
+        #                             (df_scans['Монтажник.1'] == user_type[0])]
+
+        #             for df_scans_adjuster_id, df_scans_point in zip(data['Монтажник'], data['UF_POINTS']):
+        #                 if df_scans_adjuster_id in top_users.keys():
+        #                     top_users[df_scans_adjuster_id] += df_scans_point
+        #                 else:
+        #                     top_users[df_scans_adjuster_id] = df_scans_point
+
+        #             for df_scans_adjuster_id in top_users.keys():
+        #                 if df_scans_adjuster_id in surname.keys():  # users with empty "Страна" don't count in df_users
+        #                     top_users_by_scans_lst.append([df_scans_adjuster_id,
+        #                                                    surname[df_scans_adjuster_id],
+        #                                                    top_users[df_scans_adjuster_id]])
+
+        #             top_users_by_scans_lst = sorted(top_users_by_scans_lst, key=lambda x: x[2], reverse=True)
+
+        #             top_users_by_scans_lst.append(['Итого:', '', sum(top_users.values())])
+
+        #             columns = ['ID пользователя', 'Фамилия', 'Сумма насканированных баллов']
+        #             index = [_ for _ in range(len(top_users_by_scans_lst))]
+        #             top_users_by_scans_list_df = pd.DataFrame(top_users_by_scans_lst, index, columns)
+
+        #             top_users_by_scans_list_df.to_excel(
+        #                 f'{dir_for_output_data}/TOP_adjusters_by_scans_in_{country[0]} {datetime.now().date()}.xlsx')
+        #             subprocess.Popen(f'explorer /select,{dir_for_output_data},')  # вариант для открытия папки с данными
+        #             # os.startfile(f'{dir_for_output_data}/TOP_adjusters_by_scans_in_{country[0]} {datetime.now().date()}.xlsx') # вариант для запуска созданного файла с данными
 
     def close_db_connection(self):
         """ Closing connection to database """
