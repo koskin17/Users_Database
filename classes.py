@@ -132,10 +132,10 @@ class MainWindow(QMainWindow):
     def query_to_dataframe(self, query, params=None):
         """Run query, load results into pandas DataFrame with query column names."""
 
-        results, columns = self.execute_query(query, params) # type: ignore
+        results, columns = self.execute_query(query, params)
 
         if not results or not columns:
-            QMessageBox.information(self, "Information", "DataFrame is empty.")
+            QMessageBox.information(self, "Information", "Dataframe is empty.")
             return pd.DataFrame()
         return pd.DataFrame(results, columns=columns)
 
@@ -276,7 +276,7 @@ class MainWindow(QMainWindow):
             print(start_date)  # TODO delete after testing
             print("Date correct")  # TODO delete after testing
         except ValueError:
-            QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period is incorrect!")
+            QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period  is incorrect!")
             return
         
         end_date_str, ok = QInputDialog.getText(self, "End of a period:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
@@ -409,7 +409,7 @@ class MainWindow(QMainWindow):
         try:
             start_date = datetime.strptime(start_date_str, "%d.%m.%Y")
         except ValueError:
-            QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period is incorrect!")
+            QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period  is incorrect!")
             return
         
         end_date_str, ok = QInputDialog.getText(self, "End of period", "Enter the end of the period in dd.mm.yyyy (separated by dot):")
