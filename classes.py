@@ -95,34 +95,22 @@ class MainWindow(QMainWindow):
             self.db_pool = None
 
     def execute_query(self, query, params=None):
-        """Execute SQL query with automatic connection management"""
+        """Execute query and return results, columns"""
 
         if not self.db_pool:
             QMessageBox.warning(self, "Attention!", "Database pool not initialized.")
             return None, None
         
         conn = None
-
         try:
             conn = self.db_pool.getconn()
             cursor = conn.cursor()
-
-            if params:
-                cursor.execute(query, params)
-            else:
-                cursor.execute(query)
-
-            if query.strip().upper().startswith('SELECT'):
-                results = cursor.fetchall()
-                columns = [desc[0] for desc in cursor.description]
-                return results, columns
-            else:
-                conn.commit()
-                return cursor.rowcount, None
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            return results, columns
         except Exception as e:
             QMessageBox.warning(self, "Attention!", f"Error executing query: {e}")
-            if conn:
-                conn.rollback()
             return None, None
         finally:
             if conn:
@@ -166,34 +154,34 @@ class MainWindow(QMainWindow):
         exclude_users = ('kazah89', 'kazah1122', 'russia89', 'sanin', 'samoilov', 'axorindustry', 'kreknina', 'zeykin', 'berdnikova', 'ostashenko', 'bellaruss89@gmail.com', 'skalar', 'test',
                       'malyigor', 'ihormaly', 'axor', 'kosits')
         
-        exclude_conditions = " AND ".join([f"u.email NOT LIKE '%{user}%'" for user in exclude_users])
+        placeholders = " AND ".join(["u.email NOT LIKE %s"] * len(exclude_users))
 
         query = f"""
-        SELECT u.id AS user_id,
-            u.points,
-            u.sessions_count,
-            u.login_email,
-            u.email,
-            u.first_name,
-            u.last_name,
-            u.phone,
-            u.last_login,
-            u.last_authorization,
-            u.registration_date,
-            c.country_name,
-            ut.user_type,
-            spk_name
-        FROM users AS u
-        JOIN countries AS c ON u.country_id = c.id
-        JOIN user_type AS ut ON u.user_type_id = ut.id
-        LEFT JOIN spk AS spk ON u.spk_id = spk.id
-        WHERE u.phone IS NOT NULL
-          AND u.phone <> ''
-          AND ut.user_type <> 'Клиент'
-          AND {exclude_conditions}
+            SELECT u.id AS user_id,
+                u.points,
+                u.sessions_count,
+                u.login_email,
+                u.email,
+                u.first_name,
+                u.last_name,
+                u.phone,
+                u.last_login,
+                u.last_authorization,
+                u.registration_date,
+                c.country_name,
+                ut.user_type,
+                spk_name
+            FROM users AS u
+            JOIN countries AS c ON u.country_id = c.id
+            JOIN user_type AS ut ON u.user_type_id = ut.id
+            LEFT JOIN spk AS spk ON u.spk_id = spk.id
+            WHERE u.phone IS NOT NULL
+            AND u.phone <> ''
+            AND ut.user_type <> 'Клиент'
+            AND ({placeholders})
         """
 
-        df = self.query_to_dataframe(query)
+        df = self.query_to_dataframe(query, params=exclude_users)
 
         self.df_users = df
         return df
@@ -234,6 +222,7 @@ class MainWindow(QMainWindow):
     def all_users(self, df):
         """Getting information about all users in the database"""
         self.open_dataframe_in_excel(df)
+        QMessageBox.information(self, "Information.", "Data about all users in database has been generated.")
 
     @for_data_about_users
     def users_by_country(self, df):
@@ -262,46 +251,52 @@ class MainWindow(QMainWindow):
         self.open_dataframe_in_excel(pivot_df)
         QMessageBox.information(self, "Information.", "Data on the number of authorized users has been generated.")
 
+    def parse_date(self, prompt_title, prompt_text):
+        """Helper to parse date from user input"""
+
+        date_str, ok = QInputDialog.getText(self, prompt_title, prompt_text)
+        if not ok or not date_str:
+            return None
+        try:
+            return datetime.strptime(date_str, "%d.%m.%Y")
+        except ValueError:
+            QMessageBox.warning(self, "Attention!", "The entered date is incorrect! Format: dd.mm.yyyy")
+            return None
+
+    def show_dataframe(self, df, message=None):
+        """Helper to show DataFrame in Excel and show message"""
+        if df is None or df.empty:
+            QMessageBox.warning(self, "Attention!", "DataFrame is empty.")
+            return
+        self.open_dataframe_in_excel(df)
+        if message:
+            QMessageBox.information(self, "Information", message)
+
     @for_data_about_users
     def authorization_during_period(self, df):
-        """ Information about the amount of authorized users for the period """
-
-        start_date_str, ok = QInputDialog.getText(self, "Beginning of the period:", "Specify the beginning of the period in the format dd.mm.yyyy (separated by a dot):")
-
-        if not ok or not start_date_str:
-            return
-
-        try:
-            start_date = datetime.strptime(start_date_str, "%d.%m.%Y")
-            print(start_date)  # TODO delete after testing
-            print("Date correct")  # TODO delete after testing
-        except ValueError:
-            QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period  is incorrect!")
+        """Information about the amount of authorized users for the period"""
+        
+        start_date = self.parse_date("Beginning of the period:", "Specify the beginning of the period in the format dd.mm.yyyy (separated by a dot):")
+        if start_date is None:
             return
         
-        end_date_str, ok = QInputDialog.getText(self, "End of a period:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
-
-        if not ok or not end_date_str:
-            return        
-        
-        try:    
-            end_date = datetime.strptime(end_date_str, "%d.%m.%Y")
-            print(end_date)   # TODO delete after testing
-            print("Date correct")  # TODO delete after testing
-        except ValueError:
-            QMessageBox.warning(self, "Attention!", "The entered date of the end of period is incorrect!")
+        end_date = self.parse_date("End of a period:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
+        if end_date is None:
             return
-
+        
         mask_for_filter = (df["last_authorization"] >= start_date) & (df["last_authorization"] <= end_date)
         df_period = df[mask_for_filter]
-
-        grouped = (df_period.groupby(["country_name", "user_type"]).size().reset_index(name="authorized_count"))
-
+        
+        grouped = df_period.groupby(["country_name", "user_type"]).size().reset_index(name="authorized_count")
         total = grouped["authorized_count"].sum()
-        grouped = pd.concat([grouped, pd.DataFrame([["Total", "", total]], columns = grouped.columns)])
-
-        self.open_dataframe_in_excel(grouped)
-        QMessageBox.information(self, "Information.", "Information on the number of authorized users for the period has been generated.")
+        total_row = pd.DataFrame([{
+                "country_name": "TOTAL",
+                "user_type": "",
+                "authorized_count": total
+            }])
+        grouped = pd.concat([grouped, total_row], ignore_index=True)
+                    
+        self.show_dataframe(grouped, "Information on the number of authorized users for the period has been generated.")
 
     @for_data_about_users
     def points_by_users_and_countries(self, df):
@@ -310,7 +305,11 @@ class MainWindow(QMainWindow):
         grouped = (df.groupby(["country_name", "user_type"])["points"].sum().reset_index(name="sum_points"))
 
         total_points = grouped["sum_points"].sum()
-        total_row = pd.DataFrame([["Total:", "", total_points]], columns = grouped.columns)
+        total_row = pd.DataFrame({
+                "country_name": "TOTAL",
+                "user_type": "",
+                "sum_points": total_points
+            })
         grouped = pd.concat([grouped, total_row], ignore_index=True)
 
         self.open_dataframe_in_excel(grouped)
@@ -318,20 +317,14 @@ class MainWindow(QMainWindow):
 
     @for_data_about_scans
     def all_scans(self, df):
+        """Information about all scans in the database"""
         self.open_dataframe_in_excel(df)
 
     def scanned_users_by_year(self):
         """Information about the number of scanning users by year, country, and user type"""
-
+    
         query_scanned_users_by_year = """
-            SELECT
-                combined.country_name,
-                combined.user_type,
-                EXTRACT (YEAR FROM combined.created_at) AS year,
-                COUNT (DISTINCT combined.user_identifier) AS user_count
-            FROM (
-                
-                -- Dealers scanned for himself
+            WITH base_scans AS (
                 SELECT
                     sh.user_id AS user_identifier,
                     c.country_name,
@@ -341,25 +334,10 @@ class MainWindow(QMainWindow):
                 JOIN users AS u ON sh.user_id = u.id
                 JOIN countries AS c ON u.country_id = c.id
                 JOIN user_type AS ut ON u.user_type_id = ut.id
-                WHERE sh.installer_id IS NULL AND ut.id = 1
+                WHERE sh.installer_id IS NULL AND ut.id IN (1, 2)
                 
-                UNION
-
-                -- Installer scanned for himself
-                SELECT
-                    sh.user_id AS user_identifier,
-                    c.country_name,
-                    ut.user_type,
-                    sh.created_at
-                FROM scan_history AS sh
-                JOIN users AS u ON sh.user_id = u.id
-                JOIN countries AS c ON u.country_id = c.id
-                JOIN user_type AS ut ON u.user_type_id = ut.id
-                WHERE sh.installer_id IS NULL AND ut.id = 2
-
-                UNION
-
-                -- Installer scanned for dealers
+                UNION ALL
+                
                 SELECT
                     sh.installer_id AS user_identifier,
                     installer_country.country_name,
@@ -370,16 +348,23 @@ class MainWindow(QMainWindow):
                 JOIN countries AS installer_country ON installer.country_id = installer_country.id
                 JOIN user_type AS installer_ut ON installer.user_type_id = installer_ut.id
                 WHERE sh.installer_id IS NOT NULL AND installer_ut.id = 2
-            ) AS combined
-            GROUP BY combined.country_name, combined.user_type, year
-            ORDER BY combined.country_name, combined.user_type, year;
+            )
+            SELECT
+                country_name,
+                user_type,
+                EXTRACT(YEAR FROM created_at) AS year,
+                COUNT(DISTINCT user_identifier) AS user_count
+            FROM base_scans
+            GROUP BY country_name, user_type, year
+            ORDER BY country_name, user_type, year;
         """
+    
         df_scanned_users_by_year = self.query_to_dataframe(query_scanned_users_by_year)
-
+        
         if df_scanned_users_by_year is None or df_scanned_users_by_year.empty:
             QMessageBox.warning(self, "Attention!", "No scan data is available.")
             return
-
+        
         df_scanned_users_by_year_pivot_df = (
             df_scanned_users_by_year.pivot_table(
                 index=["country_name", "user_type"],
@@ -388,44 +373,37 @@ class MainWindow(QMainWindow):
                 fill_value=0
             ).reset_index()
         )
-
+            
         self.open_dataframe_in_excel(df_scanned_users_by_year_pivot_df)
-
         QMessageBox.information(self, "Information", "Statistics on scanning users by year have been compiled.")
-
+            
         del df_scanned_users_by_year, df_scanned_users_by_year_pivot_df
         gc.collect()
-        print("All dataFrame are deleted") #TODO delete after cleaning
+        print("All dataFrame are deleted")  # TODO delete after cleaning
 
     @for_data_about_scans
     def data_about_scans_during_period(self, df):
         """Data about number of users and scans during period"""
 
-        start_date_str, ok = QInputDialog.getText(self, "Period start", "Enter the period start in dd.mm.yyyy (separated by dot):")
+        start_date = self.parse_date(
+                "Period start",
+                "Enter the period start in dd.mm.yyyy (separated by dot):"
+            )
+        if start_date is None:
+            return
 
-        if not ok or not start_date_str:
+        end_date = self.parse_date(
+            "End of period",
+            "Enter the end of the period in dd.mm.yyyy (separated by dot):"
+        )
+        if end_date is None:
             return
-        
-        try:
-            start_date = datetime.strptime(start_date_str, "%d.%m.%Y")
-        except ValueError:
-            QMessageBox.warning(self, "Attention!", "The entered date of the beginning of period  is incorrect!")
-            return
-        
-        end_date_str, ok = QInputDialog.getText(self, "End of period", "Enter the end of the period in dd.mm.yyyy (separated by dot):")
-
-        if not ok or not end_date_str:
-            return
-        try:
-            end_date = datetime.strptime(end_date_str, "%d.%m.%Y")
-        except ValueError:
-            QMessageBox.warning(self, "Attention!", "The end date of the period is entered incorrectly.")
-            return
-        
+    
         mask_for_filter = (df["created_at"] >= start_date) & (df["created_at"] <= end_date)
         df_data_about_scans_during_period = df[mask_for_filter]
 
         self.open_dataframe_in_excel(df_data_about_scans_during_period)
+        QMessageBox.information(self, "Information", "Data about scans during period has been generated.")
 
     def top_users_by_scans(self):
         """ TOP dealers / adjusters by scans"""
