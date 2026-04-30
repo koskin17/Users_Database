@@ -2,6 +2,15 @@ from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QFont
 from classes import MainWindow
 import sys
+import logging
+
+
+logging.basicConfig(
+    filename=  "app.log",
+    filemode = "a",
+    format = "%(asctime)s - %(levelname)s - %(message)s",
+    level = logging.INFO
+)
 
 
 if __name__ == '__main__':

@@ -13,6 +13,8 @@ from PyQt5.QtGui import QIcon, QPixmap, QFont
 
 from decorators import for_data_about_users, for_data_about_scans
 
+import logging
+
 class MainWindow(QMainWindow):
     db_pool: Optional[SimpleConnectionPool] = None
 
@@ -84,6 +86,9 @@ class MainWindow(QMainWindow):
     def db_connection(self):
         """Connection to database"""
         try:
+            logging.info("Attempting to connect to database...")
+            logging.debug(f"DB connection params: host={os.getenv('DB_HOST')}, db={os.getenv('DB_NAME')}, user={os.getenv('DB_USER')}")
+            
             self.db_pool = SimpleConnectionPool(
                 minconn=5,
                 maxconn=20,
@@ -94,8 +99,10 @@ class MainWindow(QMainWindow):
                 port = int(os.getenv('DB_PORT', 5432)),
             )
             QMessageBox.information(self, "Information", "Connection to the database has been established.")
+            logging.info("Connection with database is established.")
         except Exception as e:
             QMessageBox.warning(self, "Attention!", f"Error connecting to database: {e}")
+            logging.error("Error connecting to database", exc_info = True)
             self.db_pool = None
 
     def execute_query(self, query, params=None):
@@ -109,12 +116,19 @@ class MainWindow(QMainWindow):
         try:
             conn = self.db_pool.getconn()
             cursor = conn.cursor()
+            logging.info(f"Executing query: {query}")
+            logging.debug(f"With params: {params}")
+
             cursor.execute(query, params)
             results = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
+            logging.info(f"Query executed succesfull, {len(results)} row and {len(columns)} columns")
+            logging.debug(f"Columns: {columns}")
+
             return results, columns
         except Exception as e:
             QMessageBox.warning(self, "Attention!", f"Error executing query: {e}")
+            logging.error("Error executing query", exc_info = True)
             return None, None
         finally:
             if conn:
