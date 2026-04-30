@@ -49,11 +49,14 @@ class MainWindow(QMainWindow):
         self.btn_about_scans.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
         self.btn_about_scans.clicked.connect(self.all_scans)
 
-        self.btn_data_about_scan_users_in_current_year = QPushButton(
+        self.btn_scanned_users_by_year = QPushButton(
             "Scanned users by year", self)
-        self.btn_data_about_scan_users_in_current_year.clicked.connect(self.scanned_users_by_year)
+        self.btn_scanned_users_by_year.clicked.connect(self.scanned_users_by_year)
 
-        self.btn_data_about_scans_during_period = QPushButton("Кол-во пользователей и насканированных баллов за период",
+        self.btn_scans_products_by_year = QPushButton("Data about scans and sum of point by year", self)
+        self.btn_scans_products_by_year.clicked.connect(self.scans_products_by_year)
+
+        self.btn_data_about_scans_during_period = QPushButton("Scans for the period",
                                                               self)
         self.btn_data_about_scans_during_period.clicked.connect(self.data_about_scans_during_period)
 
@@ -68,7 +71,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.btn_authorization_in_period)
         layout.addWidget(self.btn_points_by_users_and_countries)
         layout.addWidget(self.btn_about_scans)
-        layout.addWidget(self.btn_data_about_scan_users_in_current_year)
+        layout.addWidget(self.btn_scanned_users_by_year)
+        layout.addWidget(self.btn_scans_products_by_year)
         layout.addWidget(self.btn_data_about_scans_during_period)
         layout.addWidget(self.btn_top_users_by_scans)
 
@@ -148,13 +152,15 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, "Attention!", f"Unable to open Excel file: {e}")
 
-    def load_and_clean_users(self):        
+    def load_and_clean_users(self):      
         """Clean spam and test accounts in DataFrame"""
 
         exclude_users = ('kazah89', 'kazah1122', 'russia89', 'sanin', 'samoilov', 'axorindustry', 'kreknina', 'zeykin', 'berdnikova', 'ostashenko', 'bellaruss89@gmail.com', 'skalar', 'test',
                       'malyigor', 'ihormaly', 'axor', 'kosits')
         
-        placeholders = " AND ".join(["u.email NOT LIKE %s"] * len(exclude_users))
+        exclude_patterns = [f"%{user}%" for user in exclude_users]
+        
+        placeholders = " AND ".join(["u.email NOT ILIKE %s"] * len(exclude_users))
 
         query = f"""
             SELECT u.id AS user_id,
@@ -181,7 +187,7 @@ class MainWindow(QMainWindow):
             AND ({placeholders})
         """
 
-        df = self.query_to_dataframe(query, params=exclude_users)
+        df = self.query_to_dataframe(query, params=exclude_patterns)
 
         self.df_users = df
         return df
@@ -284,7 +290,7 @@ class MainWindow(QMainWindow):
         if end_date is None:
             return
         
-        mask_for_filter = (df["last_authorization"] >= start_date) & (df["last_authorization"] <= end_date)
+        mask_for_filter = (df["last_authorization"].dt.date >= start_date.date()) & (df["last_authorization"].dt.date <= end_date.date())
         df_period = df[mask_for_filter]
         
         grouped = df_period.groupby(["country_name", "user_type"]).size().reset_index(name="authorized_count")
@@ -305,11 +311,11 @@ class MainWindow(QMainWindow):
         grouped = (df.groupby(["country_name", "user_type"])["points"].sum().reset_index(name="sum_points"))
 
         total_points = grouped["sum_points"].sum()
-        total_row = pd.DataFrame({
+        total_row = pd.DataFrame([{
                 "country_name": "TOTAL",
                 "user_type": "",
                 "sum_points": total_points
-            })
+            }])
         grouped = pd.concat([grouped, total_row], ignore_index=True)
 
         self.open_dataframe_in_excel(grouped)
@@ -321,12 +327,20 @@ class MainWindow(QMainWindow):
         self.open_dataframe_in_excel(df)
 
     def scanned_users_by_year(self):
-        """Information about the number of scanning users by year, country, and user type"""
+        """Information about the number of scanning users by year, country, and user type
+        
+        Generate yearly stats of distinct scanning users by country and user type.
+
+        1. Select dealers and installers who scanned for themselves, i.e., the installer_id field is empty.
+        2. Select installers who scanned for the dealer, i.e., the installer ID is specified in the installer_id field.
+        3. Combine the results into a single table, and calculate the number of unique user IDs.
+    """
     
         query_scanned_users_by_year = """
-            WITH base_scans AS (
+            WITH self_scans AS (
+                -- Dealers and installers are scans for himself
                 SELECT
-                    sh.user_id AS user_identifier,
+                    u.id AS user_id,
                     c.country_name,
                     ut.user_type,
                     sh.created_at
@@ -334,27 +348,34 @@ class MainWindow(QMainWindow):
                 JOIN users AS u ON sh.user_id = u.id
                 JOIN countries AS c ON u.country_id = c.id
                 JOIN user_type AS ut ON u.user_type_id = ut.id
-                WHERE sh.installer_id IS NULL AND ut.id IN (1, 2)
-                
-                UNION ALL
-                
+                WHERE sh.installer_id IS NULL
+                AND ut.id IN (1, 2)
+            ),
+            installer_scans AS (
+                -- Installer ar scans for dealers
                 SELECT
-                    sh.installer_id AS user_identifier,
-                    installer_country.country_name,
-                    installer_ut.user_type,
+                    sh.installer_id AS user_id,
+                    c.country_name,
+                    ut.user_type,
                     sh.created_at
                 FROM scan_history AS sh
-                JOIN users AS installer ON sh.installer_id = installer.id
-                JOIN countries AS installer_country ON installer.country_id = installer_country.id
-                JOIN user_type AS installer_ut ON installer.user_type_id = installer_ut.id
-                WHERE sh.installer_id IS NOT NULL AND installer_ut.id = 2
+                JOIN users AS u ON sh.installer_id = u.id
+                JOIN countries AS c ON u.country_id = c.id
+                JOIN user_type AS ut ON u.user_type_id = ut.id
+                WHERE sh.installer_id IS NOT NULL
+                AND ut.id = 2
+            ),
+            combined AS (
+                SELECT * FROM self_scans
+                UNION ALL
+                SELECT * FROM installer_scans
             )
             SELECT
                 country_name,
                 user_type,
                 EXTRACT(YEAR FROM created_at) AS year,
-                COUNT(DISTINCT user_identifier) AS user_count
-            FROM base_scans
+                COUNT(DISTINCT user_id) AS user_count
+            FROM combined
             GROUP BY country_name, user_type, year
             ORDER BY country_name, user_type, year;
         """
@@ -375,11 +396,54 @@ class MainWindow(QMainWindow):
         )
             
         self.open_dataframe_in_excel(df_scanned_users_by_year_pivot_df)
-        QMessageBox.information(self, "Information", "Statistics on scanning users by year have been compiled.")
+        QMessageBox.information(self, "Information", "Statistics about scanning users by year have been compiled.")
             
         del df_scanned_users_by_year, df_scanned_users_by_year_pivot_df
         gc.collect()
-        print("All dataFrame are deleted")  # TODO delete after cleaning
+
+    def scans_products_by_year(self): 
+        """Data about scans and sum of points of products by country, user type, year """
+
+        query_scans_products_by_year="""
+        SELECT
+            c.country_name,
+            ut.user_type,
+            p.product,
+            COUNT (sh.id) AS scans,
+            SUM (sh.points) AS total_points,
+            EXTRACT (YEAR FROM sh.created_at) AS year	
+        FROM scan_history AS sh
+        JOIN products AS p ON sh.product_id = p.id
+        JOIN users AS u ON sh.user_id = u.id
+        JOIN countries AS c ON u.country_id = c.id
+        JOIN user_type AS ut ON u.user_type_id = ut.id
+        GROUP BY country_name, user_type, product, user_type, year
+        ORDER BY country_name
+        """
+
+        df_scans_products_by_year = self.query_to_dataframe(query_scans_products_by_year)
+        if df_scans_products_by_year is None or df_scans_products_by_year.empty:
+            QMessageBox.warning(self, "Information", "No scan data is availale.")
+
+        df_scans_products_by_year_pivot_df = (
+            df_scans_products_by_year.pivot_table(
+                index = ["country_name", "user_type", "product"],
+                columns = "year",
+                values = ["scans", "total_points"],
+                fill_value = 0
+            ).reset_index()
+        )
+
+        df_scans_products_by_year_pivot_df.columns = [
+            "_".join([str(c) for c in col if c]) if isinstance(col, tuple) else str(col)
+            for col in df_scans_products_by_year_pivot_df.columns.values
+        ]
+
+        self.open_dataframe_in_excel(df_scans_products_by_year_pivot_df)
+        QMessageBox.information(self, "Information", "Information about scans of products and total sum has been compiled.")
+
+        del df_scans_products_by_year, df_scans_products_by_year_pivot_df
+        gc.collect()
 
     @for_data_about_scans
     def data_about_scans_during_period(self, df):
@@ -399,8 +463,17 @@ class MainWindow(QMainWindow):
         if end_date is None:
             return
     
-        mask_for_filter = (df["created_at"] >= start_date) & (df["created_at"] <= end_date)
+        mask_for_filter = (df["created_at"].dt.date >= start_date.date()) & (df["created_at"].dt.date <= end_date.date())
         df_data_about_scans_during_period = df[mask_for_filter]
+
+        # df_data_about_scans_during_period_pivot_df = (
+        #     df_data_about_scans_during_period.pivot_table(
+        #         index=["country_name", "product"],
+        #         columns="year",
+        #         values="user_count",
+        #         fill_value=0
+        #     ).reset_index()
+        # )
 
         self.open_dataframe_in_excel(df_data_about_scans_during_period)
         QMessageBox.information(self, "Information", "Data about scans during period has been generated.")
@@ -412,8 +485,10 @@ class MainWindow(QMainWindow):
             SELECT
                 combined.user_id,
                 combined.last_name,
+                combined.first_name,
                 combined.user_type,
                 combined.country,
+                combined.phone,
                 COUNT (*) AS scans_count,
                 SUM (combined.points) AS total_points
             FROM (
@@ -422,6 +497,8 @@ class MainWindow(QMainWindow):
                     sh.points,
                     ut.user_type,
                     u.last_name,
+                    u.first_name,
+                    u.phone,
                     c.country_name AS country
                 FROM scan_history AS sh
 
@@ -439,6 +516,8 @@ class MainWindow(QMainWindow):
                     sh.points,
                     installer_ut.user_type,
                     installer.last_name,
+                    installer.first_name,
+                    installer.phone,
                     installer_country.country_name AS country
                 FROM scan_history AS sh
                 JOIN users AS installer ON sh.installer_id = installer.id
@@ -446,7 +525,7 @@ class MainWindow(QMainWindow):
                 JOIN countries AS installer_country ON installer.country_id = installer_country.id
                 WHERE sh.installer_id IS NOT NULL
                 ) AS combined
-                GROUP BY combined.country, combined.user_type, combined.user_id, combined.last_name
+                GROUP BY combined.country, combined.user_type, combined.user_id, combined.last_name, combined.first_name, combined.phone
                 ORDER BY total_points DESC, scans_count DESC  
             """
         
@@ -458,13 +537,11 @@ class MainWindow(QMainWindow):
 
         del df_top_users
         gc.collect()
-        print("All dataFrame are deleted") #TODO delete after cleaning
 
     def close_db_connection(self):
         """ Closing connection to database """
         if self.db_pool:
             self.db_pool.closeall()
-            print("Connection to database closed.") #TODO удалить или заменить на логирование
 
     def closeEvent(self, event):
         """Handle window close event"""
