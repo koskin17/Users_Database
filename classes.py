@@ -98,17 +98,18 @@ class MainWindow(QMainWindow):
                 host = os.getenv('DB_HOST'),
                 port = int(os.getenv('DB_PORT', 5432)),
             )
-            QMessageBox.information(self, "Information", "Connection to the database has been established.")
             logging.info("Connection with database is established.")
+            QMessageBox.information(self, "Information", "Connection to the database has been established.")
         except Exception as e:
-            QMessageBox.warning(self, "Attention!", f"Error connecting to database: {e}")
             logging.error("Error connecting to database", exc_info = True)
+            QMessageBox.warning(self, "Attention!", f"Error connecting to database: {e}")
             self.db_pool = None
 
     def execute_query(self, query, params=None):
         """Execute query and return results, columns"""
 
         if not self.db_pool:
+            logging.warning("Database pool is not initialized. Query aborted.")
             QMessageBox.warning(self, "Attention!", "Database pool not initialized.")
             return None, None
         
@@ -127,11 +128,12 @@ class MainWindow(QMainWindow):
 
             return results, columns
         except Exception as e:
+            logging.error("Error executing query", exc_info=True)
             QMessageBox.warning(self, "Attention!", f"Error executing query: {e}")
-            logging.error("Error executing query", exc_info = True)
             return None, None
         finally:
             if conn:
+                logging.info("Releasing database connection back to pool.")
                 cursor.close()
                 self.db_pool.putconn(conn)
 
@@ -141,6 +143,7 @@ class MainWindow(QMainWindow):
         results, columns = self.execute_query(query, params)
 
         if not results or not columns:
+            logging.info("Dataframe is empty after query execution.", exc_info = True)
             QMessageBox.information(self, "Information", "Dataframe is empty.")
             return pd.DataFrame()
         return pd.DataFrame(results, columns=columns)
@@ -149,6 +152,7 @@ class MainWindow(QMainWindow):
         """Open DataFrame in Excel using a temporary file."""
 
         if df is None or df.empty:
+            logging.info("Dataframe is empty. Cannot open in Excel.")
             QMessageBox.warning(self, "Attention!", "DataFrame is empty.")
             return
         
@@ -164,9 +168,10 @@ class MainWindow(QMainWindow):
                 opener = "open" if sys.platform == "darwin" else "xdg-open"
                 subprocess.Popen([opener, tmp_path])
         except Exception as e:
+            logging.error("Error opening excel file", exc_info = True)
             QMessageBox.warning(self, "Attention!", f"Unable to open Excel file: {e}")
 
-    def load_and_clean_users(self):      
+    def load_and_clean_users(self):     
         """Clean spam and test accounts in DataFrame"""
 
         exclude_users = ('kazah89', 'kazah1122', 'russia89', 'sanin', 'samoilov', 'axorindustry', 'kreknina', 'zeykin', 'berdnikova', 'ostashenko', 'bellaruss89@gmail.com', 'skalar', 'test',
@@ -242,6 +247,7 @@ class MainWindow(QMainWindow):
     def all_users(self, df):
         """Getting information about all users in the database"""
         self.open_dataframe_in_excel(df)
+        logging.info("Data about all users in database has been generted")
         QMessageBox.information(self, "Information.", "Data about all users in database has been generated.")
 
     @for_data_about_users
@@ -269,7 +275,8 @@ class MainWindow(QMainWindow):
         ).reset_index()
 
         self.open_dataframe_in_excel(pivot_df)
-        QMessageBox.information(self, "Information.", "Data on the number of authorized users has been generated.")
+        logging.info("Data about number of authorizedusers has been generated.")
+        QMessageBox.information(self, "Information.", "Data of the number of authorized users has been generated.")
 
     def parse_date(self, prompt_title, prompt_text):
         """Helper to parse date from user input"""
@@ -280,16 +287,20 @@ class MainWindow(QMainWindow):
         try:
             return datetime.strptime(date_str, "%d.%m.%Y")
         except ValueError:
+            logging.error("Invalid date format entered by user", exc_info = True)
             QMessageBox.warning(self, "Attention!", "The entered date is incorrect! Format: dd.mm.yyyy")
             return None
 
     def show_dataframe(self, df, message=None):
         """Helper to show DataFrame in Excel and show message"""
+
         if df is None or df.empty:
+            logging.error("Dataframe is emty.", exc_info = True)
             QMessageBox.warning(self, "Attention!", "DataFrame is empty.")
             return
         self.open_dataframe_in_excel(df)
         if message:
+            logging.info(message, exc_info = True)
             QMessageBox.information(self, "Information", message)
 
     @for_data_about_users
@@ -298,10 +309,12 @@ class MainWindow(QMainWindow):
         
         start_date = self.parse_date("Beginning of the period:", "Specify the beginning of the period in the format dd.mm.yyyy (separated by a dot):")
         if start_date is None:
+            logging.error("Start date is not valid. Authorization during period cannot be calculated.", exc_info = True)
             return
         
         end_date = self.parse_date("End of a period:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
         if end_date is None:
+            logging.error("End date is not valid. Authorization during period cannot be calculated.", exc_info = True)
             return
         
         mask_for_filter = (df["last_authorization"].dt.date >= start_date.date()) & (df["last_authorization"].dt.date <= end_date.date())
@@ -315,8 +328,9 @@ class MainWindow(QMainWindow):
                 "authorized_count": total
             }])
         grouped = pd.concat([grouped, total_row], ignore_index=True)
-                    
-        self.show_dataframe(grouped, "Information on the number of authorized users for the period has been generated.")
+
+        logging.info("Information about the number of authorized users for the period has been generated.", exc_info = True)
+        self.show_dataframe(grouped, "Information of the number of authorized users for the period has been generated.")
 
     @for_data_about_users
     def points_by_users_and_countries(self, df):
@@ -333,11 +347,13 @@ class MainWindow(QMainWindow):
         grouped = pd.concat([grouped, total_row], ignore_index=True)
 
         self.open_dataframe_in_excel(grouped)
+        logging.info("Data about the current sum of points by type of users and countries has been genrated.", exc_info = True)
         QMessageBox.information(self, "Information", "Data about the current sum of points by type of users and countries has been generated.")
 
     @for_data_about_scans
     def all_scans(self, df):
         """Information about all scans in the database"""
+        logging.info("Information about all scans in database has been generated.", exc_info = True)
         self.open_dataframe_in_excel(df)
 
     def scanned_users_by_year(self):
@@ -397,6 +413,7 @@ class MainWindow(QMainWindow):
         df_scanned_users_by_year = self.query_to_dataframe(query_scanned_users_by_year)
         
         if df_scanned_users_by_year is None or df_scanned_users_by_year.empty:
+            logging.error("Data about scanning users by year is empty after query execution.", exc_info = True)
             QMessageBox.warning(self, "Attention!", "No scan data is available.")
             return
         
@@ -410,6 +427,7 @@ class MainWindow(QMainWindow):
         )
             
         self.open_dataframe_in_excel(df_scanned_users_by_year_pivot_df)
+        logging.info("Statistics about scanning users by year has been compiled.", exc_info = True)
         QMessageBox.information(self, "Information", "Statistics about scanning users by year have been compiled.")
             
         del df_scanned_users_by_year, df_scanned_users_by_year_pivot_df
@@ -437,6 +455,7 @@ class MainWindow(QMainWindow):
 
         df_scans_products_by_year = self.query_to_dataframe(query_scans_products_by_year)
         if df_scans_products_by_year is None or df_scans_products_by_year.empty:
+            logging.error("Data about scans and points of products by year is empty after query excutoin", exc_info = True)
             QMessageBox.warning(self, "Information", "No scan data is availale.")
 
         df_scans_products_by_year_pivot_df = (
@@ -454,6 +473,7 @@ class MainWindow(QMainWindow):
         ]
 
         self.open_dataframe_in_excel(df_scans_products_by_year_pivot_df)
+        logging.info("Information about scans of products and total sum has been compild.", exc_info = True)
         QMessageBox.information(self, "Information", "Information about scans of products and total sum has been compiled.")
 
         del df_scans_products_by_year, df_scans_products_by_year_pivot_df
@@ -468,6 +488,7 @@ class MainWindow(QMainWindow):
                 "Enter the period start in dd.mm.yyyy (separated by dot):"
             )
         if start_date is None:
+            logging.error("Start date is not valid. Data about scans during period cannot be generated.", exc_info = True)
             return
 
         end_date = self.parse_date(
@@ -475,20 +496,13 @@ class MainWindow(QMainWindow):
             "Enter the end of the period in dd.mm.yyyy (separated by dot):"
         )
         if end_date is None:
+            logging.error("End date is not valid. Data about scans during period cannot be generated.", exc_info = True)
             return
     
         mask_for_filter = (df["created_at"].dt.date >= start_date.date()) & (df["created_at"].dt.date <= end_date.date())
         df_data_about_scans_during_period = df[mask_for_filter]
 
-        # df_data_about_scans_during_period_pivot_df = (
-        #     df_data_about_scans_during_period.pivot_table(
-        #         index=["country_name", "product"],
-        #         columns="year",
-        #         values="user_count",
-        #         fill_value=0
-        #     ).reset_index()
-        # )
-
+        logging.info("Data about scans during period has been generated.", exc_info = True)
         self.open_dataframe_in_excel(df_data_about_scans_during_period)
         QMessageBox.information(self, "Information", "Data about scans during period has been generated.")
 
@@ -547,6 +561,7 @@ class MainWindow(QMainWindow):
 
         self.open_dataframe_in_excel(df_top_users)
 
+        logging.info("Information about TOP users has been compiled.", exc_info = True)
         QMessageBox.information(self, "Information", "Information about TOP users have been compiled.")
 
         del df_top_users
@@ -554,11 +569,22 @@ class MainWindow(QMainWindow):
 
     def close_db_connection(self):
         """ Closing connection to database """
+
         if self.db_pool:
-            self.db_pool.closeall()
+            try:
+                logging.info("Closing all database connections in pool.")
+                self.db_pool.closeall()
+                logging.info("All database connections have been closed.")
+            except Exception as e:
+                logging.error("Error closing database connections", exc_info = True)
 
     def closeEvent(self, event):
         """Handle window close event"""
-        self.close_db_connection()
+        try:
+            logging.info("Main window is closing.")
+            self.close_db_connection()
+            logging.info("Main window is closed.")
+        except Exception as e:
+            logging.error("Error during aplication shutdows", exc_info = True)
         event.accept()
     
