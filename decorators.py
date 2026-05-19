@@ -14,7 +14,7 @@ def for_data_about_users(func):
         df: pd.DataFrame = self.load_and_clean_users()
         
         if df.empty:
-            logging.warning("Warning! After cleaning database is empty. Data about users cannot be generated.", exc_info = True)
+            logging.warning("Warning! After cleaning database is empty. Data about users cannot be generated.")
             QMessageBox.warning(self, "Warning!", "After cleaning database is empty.")
             return
         try:
@@ -26,12 +26,10 @@ def for_data_about_users(func):
                 result = func(self, df, **kwargs)
         finally:
             try:
-                logging.info("Cleaning up user data from memory.", exc_info = True)
                 del df
                 gc.collect()
-                logging.info("User data has been cleaneв from memory.", exc_info = True)
             except Exception as e:
-                logging.error("Error during cleaning up user data from memory.", exc_info = True)        
+                logging.error("Error during cleaning up user data from memory.", exc_info = True)
         return result
     
     return wrapper
@@ -44,7 +42,7 @@ def for_data_about_scans(func):
         df: pd.DataFrame = self.load_data_about_scans()
         
         if df.empty:
-            logging.warning("Warning! Database about scans is empty. Data about scans generated cannot be generated.", exc_info = True)
+            logging.warning("Warning! Database about scans is empty. Data about scans generated cannot be generated.")
             QMessageBox.warning(self, "Warning!", "Database about scans is empty.")
             return
         try:
@@ -56,10 +54,8 @@ def for_data_about_scans(func):
                 result = func(self, df, **kwargs)
         finally:
             try:
-                logging.info("Cleaning up scan data from memory.", exc_info = True)
                 del df
                 gc.collect()
-                logging.info("Scan data has been cleaned from memory.", exc_info = True)
             except Exception as e:
                 logging.error("Error during cleaning up scan data from memory.", exc_info = True)
         

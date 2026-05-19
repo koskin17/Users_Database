@@ -123,7 +123,7 @@ class MainWindow(QMainWindow):
             cursor.execute(query, params)
             results = cursor.fetchall()
             columns = [desc[0] for desc in cursor.description]
-            logging.info(f"Query executed succesfull, {len(results)} row and {len(columns)} columns")
+            logging.info(f"Query executed successfully, {len(results)} rows and {len(columns)} columns")
             logging.debug(f"Columns: {columns}")
 
             return results, columns
@@ -143,7 +143,6 @@ class MainWindow(QMainWindow):
         results, columns = self.execute_query(query, params)
 
         if not results or not columns:
-            logging.info("Dataframe is empty after query execution.", exc_info = True)
             QMessageBox.information(self, "Information", "Dataframe is empty.")
             return pd.DataFrame()
         return pd.DataFrame(results, columns=columns)
@@ -152,7 +151,6 @@ class MainWindow(QMainWindow):
         """Open DataFrame in Excel using a temporary file."""
 
         if df is None or df.empty:
-            logging.info("Dataframe is empty. Cannot open in Excel.")
             QMessageBox.warning(self, "Attention!", "DataFrame is empty.")
             return
         
@@ -173,6 +171,7 @@ class MainWindow(QMainWindow):
 
     def load_and_clean_users(self):     
         """Clean spam and test accounts in DataFrame"""
+        logging.info("Loading and cleaning user data.")
 
         exclude_users = ('kazah89', 'kazah1122', 'russia89', 'sanin', 'samoilov', 'axorindustry', 'kreknina', 'zeykin', 'berdnikova', 'ostashenko', 'bellaruss89@gmail.com', 'skalar', 'test',
                       'malyigor', 'ihormaly', 'axor', 'kosits')
@@ -207,12 +206,14 @@ class MainWindow(QMainWindow):
         """
 
         df = self.query_to_dataframe(query, params=exclude_patterns)
+        logging.info("User data loaded and cleaned: %d rows.", len(df))
 
         self.df_users = df
         return df
     
     def load_data_about_scans(self):
         """Loading data about scans by all users"""
+        logging.info("Loading scan history data.")
 
         query = """
         SELECT
@@ -240,6 +241,7 @@ class MainWindow(QMainWindow):
         """
 
         df = self.query_to_dataframe(query)
+        logging.info("Scan history data loaded: %d rows.", len(df))
         self.df_scans = df
         return df
 
@@ -247,13 +249,11 @@ class MainWindow(QMainWindow):
     def all_users(self, df):
         """Getting information about all users in the database"""
         self.open_dataframe_in_excel(df)
-        logging.info("Data about all users in database has been generted")
         QMessageBox.information(self, "Information.", "Data about all users in database has been generated.")
 
     @for_data_about_users
     def users_by_country(self, df):
         """General statistics about users by countries."""
-
         users_by_countries = df.groupby(["country_name", "user_type"]).size().reset_index(name='count')
         self.open_dataframe_in_excel(users_by_countries)
 
@@ -275,7 +275,6 @@ class MainWindow(QMainWindow):
         ).reset_index()
 
         self.open_dataframe_in_excel(pivot_df)
-        logging.info("Data about number of authorizedusers has been generated.")
         QMessageBox.information(self, "Information.", "Data of the number of authorized users has been generated.")
 
     def parse_date(self, prompt_title, prompt_text):
@@ -295,12 +294,11 @@ class MainWindow(QMainWindow):
         """Helper to show DataFrame in Excel and show message"""
 
         if df is None or df.empty:
-            logging.error("Dataframe is emty.", exc_info = True)
+            logging.error("DataFrame is empty.")
             QMessageBox.warning(self, "Attention!", "DataFrame is empty.")
             return
         self.open_dataframe_in_excel(df)
         if message:
-            logging.info(message, exc_info = True)
             QMessageBox.information(self, "Information", message)
 
     @for_data_about_users
@@ -329,7 +327,6 @@ class MainWindow(QMainWindow):
             }])
         grouped = pd.concat([grouped, total_row], ignore_index=True)
 
-        logging.info("Information about the number of authorized users for the period has been generated.", exc_info = True)
         self.show_dataframe(grouped, "Information of the number of authorized users for the period has been generated.")
 
     @for_data_about_users
@@ -347,13 +344,11 @@ class MainWindow(QMainWindow):
         grouped = pd.concat([grouped, total_row], ignore_index=True)
 
         self.open_dataframe_in_excel(grouped)
-        logging.info("Data about the current sum of points by type of users and countries has been genrated.", exc_info = True)
         QMessageBox.information(self, "Information", "Data about the current sum of points by type of users and countries has been generated.")
 
     @for_data_about_scans
     def all_scans(self, df):
         """Information about all scans in the database"""
-        logging.info("Information about all scans in database has been generated.", exc_info = True)
         self.open_dataframe_in_excel(df)
 
     def scanned_users_by_year(self):
@@ -427,7 +422,6 @@ class MainWindow(QMainWindow):
         )
             
         self.open_dataframe_in_excel(df_scanned_users_by_year_pivot_df)
-        logging.info("Statistics about scanning users by year has been compiled.", exc_info = True)
         QMessageBox.information(self, "Information", "Statistics about scanning users by year have been compiled.")
             
         del df_scanned_users_by_year, df_scanned_users_by_year_pivot_df
@@ -455,8 +449,8 @@ class MainWindow(QMainWindow):
 
         df_scans_products_by_year = self.query_to_dataframe(query_scans_products_by_year)
         if df_scans_products_by_year is None or df_scans_products_by_year.empty:
-            logging.error("Data about scans and points of products by year is empty after query excutoin", exc_info = True)
-            QMessageBox.warning(self, "Information", "No scan data is availale.")
+            logging.error("Data about scans and points of products by year is empty after query execution", exc_info = True)
+            QMessageBox.warning(self, "Information", "No scan data is available.")
 
         df_scans_products_by_year_pivot_df = (
             df_scans_products_by_year.pivot_table(
@@ -473,7 +467,6 @@ class MainWindow(QMainWindow):
         ]
 
         self.open_dataframe_in_excel(df_scans_products_by_year_pivot_df)
-        logging.info("Information about scans of products and total sum has been compild.", exc_info = True)
         QMessageBox.information(self, "Information", "Information about scans of products and total sum has been compiled.")
 
         del df_scans_products_by_year, df_scans_products_by_year_pivot_df
@@ -502,7 +495,6 @@ class MainWindow(QMainWindow):
         mask_for_filter = (df["created_at"].dt.date >= start_date.date()) & (df["created_at"].dt.date <= end_date.date())
         df_data_about_scans_during_period = df[mask_for_filter]
 
-        logging.info("Data about scans during period has been generated.", exc_info = True)
         self.open_dataframe_in_excel(df_data_about_scans_during_period)
         QMessageBox.information(self, "Information", "Data about scans during period has been generated.")
 
@@ -561,7 +553,6 @@ class MainWindow(QMainWindow):
 
         self.open_dataframe_in_excel(df_top_users)
 
-        logging.info("Information about TOP users has been compiled.", exc_info = True)
         QMessageBox.information(self, "Information", "Information about TOP users have been compiled.")
 
         del df_top_users
@@ -572,19 +563,15 @@ class MainWindow(QMainWindow):
 
         if self.db_pool:
             try:
-                logging.info("Closing all database connections in pool.")
                 self.db_pool.closeall()
-                logging.info("All database connections have been closed.")
             except Exception as e:
                 logging.error("Error closing database connections", exc_info = True)
 
     def closeEvent(self, event):
         """Handle window close event"""
         try:
-            logging.info("Main window is closing.")
             self.close_db_connection()
-            logging.info("Main window is closed.")
         except Exception as e:
-            logging.error("Error during aplication shutdows", exc_info = True)
+            logging.error("Error during application shutdown", exc_info = True)
         event.accept()
     
