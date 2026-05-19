@@ -1,9 +1,12 @@
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QFont
-from classes import MainWindow
 import sys
+from dotenv import load_dotenv
 import logging
 
+load_dotenv()
+
+from classes import MainWindow
 
 logging.basicConfig(
     filename=  "app.log",

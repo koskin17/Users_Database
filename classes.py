@@ -1,11 +1,12 @@
-import os, tempfile, subprocess, sys
-import gc
+import os
+import tempfile
+import subprocess
+import sys
 
 import pandas as pd
 from datetime import datetime
 
 from psycopg2.pool import SimpleConnectionPool
-from dotenv import load_dotenv
 from typing import Optional
 
 from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QInputDialog, QWidget, QVBoxLayout
@@ -21,7 +22,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        load_dotenv()
+        self.df_users = None
+        self.df_scans = None
+
         self.db_connection()
         
         self.resize(620, 600)
@@ -116,13 +119,13 @@ class MainWindow(QMainWindow):
         conn = None
         try:
             conn = self.db_pool.getconn()
-            cursor = conn.cursor()
             logging.info(f"Executing query: {query}")
             logging.debug(f"With params: {params}")
+            with conn.cursor() as cursor:
+                cursor.execute(query, params)
+                results = cursor.fetchall()
+                columns = [desc[0] for desc in cursor.description]
 
-            cursor.execute(query, params)
-            results = cursor.fetchall()
-            columns = [desc[0] for desc in cursor.description]
             logging.info(f"Query executed successfully, {len(results)} rows and {len(columns)} columns")
             logging.debug(f"Columns: {columns}")
 
@@ -133,17 +136,20 @@ class MainWindow(QMainWindow):
             return None, None
         finally:
             if conn:
-                logging.info("Releasing database connection back to pool.")
-                cursor.close()
                 self.db_pool.putconn(conn)
 
     def query_to_dataframe(self, query, params=None):
         """Run query, load results into pandas DataFrame with query column names."""
 
-        results, columns = self.execute_query(query, params)
+        try:
+            results, columns = self.execute_query(query, params)
+        except Exception as e:
+            logging.error("Error converting query to DataFrame", exc_info = True)
+            QMessageBox.Warning(self, "Attention!", f"Error converting query to DataFrame", f"Error: {e}")
+            return pd.DataFrame()
 
         if not results or not columns:
-            QMessageBox.information(self, "Information", "Dataframe is empty.")
+            QMessageBox.information(self, "Information", "DataFrame is empty.")
             return pd.DataFrame()
         return pd.DataFrame(results, columns=columns)
 
@@ -173,14 +179,15 @@ class MainWindow(QMainWindow):
         """Clean spam and test accounts in DataFrame"""
         logging.info("Loading and cleaning user data.")
 
-        exclude_users = ('kazah89', 'kazah1122', 'russia89', 'sanin', 'samoilov', 'axorindustry', 'kreknina', 'zeykin', 'berdnikova', 'ostashenko', 'bellaruss89@gmail.com', 'skalar', 'test',
-                      'malyigor', 'ihormaly', 'axor', 'kosits')
-        
-        exclude_patterns = [f"%{user}%" for user in exclude_users]
-        
-        placeholders = " AND ".join(["u.email NOT ILIKE %s"] * len(exclude_users))
+        exclude_users = (
+            'kazah89', 'kazah1122', 'russia89', 'sanin', 'samoilov', 'axorindustry',
+            'kreknina', 'zeykin', 'berdnikova', 'ostashenko', 'bellaruss89@gmail.com',
+            'skalar', 'test', 'malyigor', 'ihormaly', 'axor', 'kosits'
+        )
 
-        query = f"""
+        exclude_patterns = [f"%{user}%" for user in exclude_users]
+
+        query = """
             SELECT u.id AS user_id,
                 u.points,
                 u.sessions_count,
@@ -202,10 +209,10 @@ class MainWindow(QMainWindow):
             WHERE u.phone IS NOT NULL
             AND u.phone <> ''
             AND ut.user_type <> 'Клиент'
-            AND ({placeholders})
+            AND NOT (u.email ILIKE ANY (%s::text[]))
         """
 
-        df = self.query_to_dataframe(query, params=exclude_patterns)
+        df = self.query_to_dataframe(query, params=(exclude_patterns,))
         logging.info("User data loaded and cleaned: %d rows.", len(df))
 
         self.df_users = df
@@ -313,6 +320,11 @@ class MainWindow(QMainWindow):
         end_date = self.parse_date("End of a period:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
         if end_date is None:
             logging.error("End date is not valid. Authorization during period cannot be calculated.", exc_info = True)
+            return
+
+        if end_date <= start_date:
+            QMessageBox.warning(self, "Warning!", "End date must be greater than start date.")
+            logging.error("End date is greated or equals start date. Authorization during period cannot be calculated.", exc_info = True)
             return
         
         mask_for_filter = (df["last_authorization"].dt.date >= start_date.date()) & (df["last_authorization"].dt.date <= end_date.date())
@@ -423,9 +435,6 @@ class MainWindow(QMainWindow):
             
         self.open_dataframe_in_excel(df_scanned_users_by_year_pivot_df)
         QMessageBox.information(self, "Information", "Statistics about scanning users by year have been compiled.")
-            
-        del df_scanned_users_by_year, df_scanned_users_by_year_pivot_df
-        gc.collect()
 
     def scans_products_by_year(self): 
         """Data about scans and sum of points of products by country, user type, year """
@@ -443,7 +452,7 @@ class MainWindow(QMainWindow):
         JOIN users AS u ON sh.user_id = u.id
         JOIN countries AS c ON u.country_id = c.id
         JOIN user_type AS ut ON u.user_type_id = ut.id
-        GROUP BY country_name, user_type, product, user_type, year
+        GROUP BY country_name, user_type, product, year
         ORDER BY country_name
         """
 
@@ -469,9 +478,6 @@ class MainWindow(QMainWindow):
         self.open_dataframe_in_excel(df_scans_products_by_year_pivot_df)
         QMessageBox.information(self, "Information", "Information about scans of products and total sum has been compiled.")
 
-        del df_scans_products_by_year, df_scans_products_by_year_pivot_df
-        gc.collect()
-
     @for_data_about_scans
     def data_about_scans_during_period(self, df):
         """Data about number of users and scans during period"""
@@ -490,6 +496,11 @@ class MainWindow(QMainWindow):
         )
         if end_date is None:
             logging.error("End date is not valid. Data about scans during period cannot be generated.", exc_info = True)
+            return
+
+        if end_date < start_date:
+            QMessageBox.warning(self, "Attention!", "End date must be the same or after start date.")
+            logging.error("End date is before start date. Data about scans during period cannot be generated.")
             return
     
         mask_for_filter = (df["created_at"].dt.date >= start_date.date()) & (df["created_at"].dt.date <= end_date.date())
@@ -555,9 +566,6 @@ class MainWindow(QMainWindow):
 
         QMessageBox.information(self, "Information", "Information about TOP users have been compiled.")
 
-        del df_top_users
-        gc.collect()
-
     def close_db_connection(self):
         """ Closing connection to database """
 
@@ -569,9 +577,14 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close event"""
+
         try:
             self.close_db_connection()
         except Exception as e:
             logging.error("Error during application shutdown", exc_info = True)
-        event.accept()
+
+        try:
+            event.accept()
+        except Exception as e:
+            logging.error("Error accepting close event", exc_info = True)
     
