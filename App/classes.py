@@ -1,7 +1,6 @@
 import os, sys
 import tempfile
 import subprocess
-import sys
 
 import pandas as pd
 from datetime import datetime

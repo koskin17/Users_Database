@@ -1,12 +1,13 @@
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtGui import QFont
-import sys
+import sys, os
 from dotenv import load_dotenv
 import logging
 
-load_dotenv()
+from classes import MainWindow, resource_path
 
-from classes import MainWindow
+env_path = resource_path(".env")
+load_dotenv(env_path)
 
 logging.basicConfig(
     filename=  "app.log",
