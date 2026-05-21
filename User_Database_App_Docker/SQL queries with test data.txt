@@ -1,0 +1,113 @@
+CREATE TABLE cities (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE companies (
+	id SERIAL PRIMARY KEY,
+	company_name VARCHAR(255) NOT NULL
+)
+
+CREATE TABLE user_type (
+	id SERIAL PRIMARY KEY,
+	company_name VARCHAR(30) NOT NULL
+)
+
+CREATE TABLE SPK (
+	id SERIAL PRIMARY KEY,
+	company_name VARCHAR(100) NOT NULL
+)
+
+CREATE TABLE country (
+	id SERIAL PRIMARY KEY,
+	company_name VARCHAR(100) NOT NULL
+)
+
+INSERT INTO cities (name)
+VALUES
+('Киев'),
+('Львов'),
+('Одесса'),
+('Харьков'),
+('Днепр'),
+('Запорожье'),
+('Винница'),
+('Полтава'),
+('Варшава'),
+('Краков'),
+('Берлин'),
+('Мюнхен'),
+('Париж'),
+('Лион'),
+('Мадрид'),
+('Барселона'),
+('Рим'),
+('Милан'),
+('Лондон'),
+('Прага');
+
+INSERT INTO companies (company_name)
+SELECT
+	'Компания' || floor(random() * 1000 + 1)::int
+FROM generate_series(1,500)
+
+INSERT INTO countries (country_name)
+VALUES
+('Украина'),
+('Польша'),
+('Германия'),
+('Франция'),
+('Испания'),
+('Италия'),
+('США'),
+('Канада'),
+('Великобритания'),
+('Чехия');
+
+INSERT INTO spk (spk_name)
+SELECT
+	'СПК ' || floor(random() * 1000 + 1)::int
+FROM generate_series(1,150)
+
+CREATE TABLE users (
+	id SERIAL PRIMARY KEY,
+	points INTEGER DEFAULT 0 CHECK (points >= 0),
+	sessions_count INTEGER DEFAULT 0 CHECK (sessions_count >= 0),
+	login_email VARCHAR(255) UNIQUE NOT NULL,
+	email VARCHAR(255) UNIQUE NOT NULL,
+	password_hash VARCHAR(255),
+	user_type_id INTEGER NOT NULL REFERENCES user_type(id),
+	is_active BOOLEAN DEFAULT TRUE,
+	first_name VARCHAR(255) NOT NULL,
+	last_name VARCHAR(255) NOT NULL,
+	middle_name  VARCHAR(255),
+	phone VARCHAR(20),
+	country_id INTEGER REFERENCES countries(id),
+	work_city_id INTEGER REFERENCES cities(id),
+	living_city_id INTEGER REFERENCES cities(id),
+	company_id INTEGER REFERENCES companies(id),
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	last_login TIMESTAMP,
+	last_authorization TIMESTAMP,
+	registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	spk INTEGER REFERENCES spk(id)
+)
+
+CREATE TABLE relations (
+    id SERIAL PRIMARY KEY,
+    dealer_id INT REFERENCES users(id),      -- дилер
+    installer_id INT REFERENCES users(id),   -- монтажник
+    company_id INT                           -- для удобства, чтобы видеть связь
+);
+
+CREATE TABLE scan_history (
+    id SERIAL PRIMARY KEY,
+    product_id INT REFERENCES products(id),     -- связь с products
+    points INT,                                 -- подтягивается из products
+    qr_code VARCHAR(20) NOT NULL,               -- случайный код
+    company_id INT,                             -- пока пустое поле
+    user_id INT,                                -- пока пустое поле
+    installer_id INT,                           -- пока пустое поле
+    created_at TIMESTAMP NOT NULL               -- дата/время создания
+);
