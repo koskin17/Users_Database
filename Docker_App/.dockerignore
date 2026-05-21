@@ -1,0 +1,11 @@
+__pychache__/
+*.pyc
+*.pyo
+*.log
+.venv/
+.env
+
+.DB_backup/
+.SQL_queries/
+
+SQL queries with test data.txt
