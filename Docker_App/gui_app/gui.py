@@ -12,7 +12,7 @@ from typing import Optional
 from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QInputDialog, QWidget, QVBoxLayout
 from PyQt5.QtGui import QIcon, QPixmap, QFont
 
-from decorators import for_data_about_users, for_data_about_scans
+from Docker_App.server_app.decorators import for_data_about_users, for_data_about_scans
 
 import logging
 
