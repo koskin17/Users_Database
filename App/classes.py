@@ -1,4 +1,4 @@
-import os
+import os, sys
 import tempfile
 import subprocess
 import sys
@@ -16,6 +16,12 @@ from decorators import for_data_about_users, for_data_about_scans
 
 import logging
 
+base_dir = os.path.dirname(os.path.abspath(__file__))
+
+def resource_path(relative_path):
+    """Return right path in dev and exe"""
+    return os.path.join(base_dir, relative_path)
+
 class MainWindow(QMainWindow):
     db_pool: Optional[SimpleConnectionPool] = None
 
@@ -26,13 +32,15 @@ class MainWindow(QMainWindow):
         self.df_scans = None
 
         self.db_connection()
-        
+
+        icon_path = resource_path("Pictures/axor.ico")
         self.resize(620, 600)
         self.setWindowTitle("Данные по пользователя и сканам в приложении AXOR")
-        self.setWindowIcon(QIcon('Pictures/axor.ico'))
-
+        self.setWindowIcon(QIcon(icon_path))
+        
+        picture_path = resource_path("Pictures/axor_logo.png")
         self.label = QLabel()
-        self.label.setPixmap(QPixmap('Pictures/axor_logo.png'))
+        self.label.setPixmap(QPixmap(picture_path))
 
         self.btn_about_users = QPushButton("All users", self)
         self.btn_about_users.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
