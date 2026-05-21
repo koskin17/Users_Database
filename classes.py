@@ -322,7 +322,7 @@ class MainWindow(QMainWindow):
             logging.error("End date is not valid. Authorization during period cannot be calculated.", exc_info = True)
             return
 
-        if end_date <= start_date:
+        if end_date < start_date:
             QMessageBox.warning(self, "Warning!", "End date must be greater than start date.")
             logging.error("End date is greated or equals start date. Authorization during period cannot be calculated.", exc_info = True)
             return
