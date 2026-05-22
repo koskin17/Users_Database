@@ -1,16 +1,10 @@
 import os
-import tempfile
-import subprocess
-import sys
 
 import pandas as pd
 from datetime import datetime
 
 from psycopg2.pool import SimpleConnectionPool
 from typing import Optional
-
-from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QInputDialog, QWidget, QVBoxLayout
-from PyQt5.QtGui import QIcon, QPixmap, QFont
 
 from Docker_App.server_app.decorators import for_data_about_users, for_data_about_scans
 
