@@ -49,6 +49,7 @@ class DatabaseService:
             conn = self.db_pool.getconn()
             logging.info(f"Executing query: {query}")
             logging.debug(f"With params: {params}")
+
             with conn.cursor() as cursor:
                 cursor.execute(query, params)
                 results = cursor.fetchall()
