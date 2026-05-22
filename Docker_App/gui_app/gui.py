@@ -5,13 +5,47 @@ import sys
 
 import pandas as pd
 from datetime import datetime
+from functools import wraps
 
 from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QInputDialog, QWidget, QVBoxLayout
 from PyQt5.QtGui import QIcon, QPixmap, QFont
 
-from Docker_App.server_app.decorators import for_data_about_users, for_data_about_scans
+from Docker_App.server_app.server import DatabaseService
 
 import logging
+
+def for_data_about_users(func):
+    """Decorator for loading and cleaning user data"""
+
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+
+        df = self.load_and_clean_users()
+
+        if df is None or df.empty:
+            logging.warning("Warning! After cleaning database is empty. Data about users cannot be generated.")
+            QMessageBox.warning(self, "Warning!", "After cleaning database is empty.")
+            return
+        
+        return func(self, df, *args, **kwargs)
+    
+    return wrapper
+
+def for_data_about_scans(func):
+    """Decorator for loading data about scans"""
+
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+
+        df = self.load_data_about_scans()
+
+        if df is None or df.empty:
+            logging.warning("Warning! Database about scans is empty. Data about scans generated cannot be generated.")
+            QMessageBox.warning(self, "Warning!", "Database about scans is empty.")
+            return
+
+        return func(self, df, *args, **kwargs)
+    return wrapper
 
 class MainWindow(QMainWindow):
 
@@ -20,6 +54,7 @@ class MainWindow(QMainWindow):
 
         self.df_users = None
         self.df_scans = None
+        self.data_service = DatabaseService()
         
         self.resize(620, 600)
         self.setWindowTitle("Данные по пользователя и сканам в приложении AXOR")
@@ -80,6 +115,27 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(container)
 
+    def load_and_clean_users(self, force_reload: bool = False):
+        """Load and clean user data from database service"""
+        
+        if not force_reload and self.df_users is not None and not self.df_users.empty:
+            logging.info("Using cached user data.")
+            return self.df_users
+        
+        df = self.data_service.load_and_clean_users()
+        self.df_users = df
+        return df
+
+    def load_data_about_scans(self, force_reload: bool = False):
+        """Load and cache scan data from database service"""
+        if not force_reload and self.df_scans is not None and not self.df_scans.empty:
+            logging.info("Using cached scan data.")
+            return self.df_scans
+
+        df = self.data_service.load_data_about_scans()
+        self.df_scans = df
+        return df
+
     def open_dataframe_in_excel(self, df):
         """Open DataFrame in Excel using a temporary file."""
 
@@ -134,6 +190,18 @@ class MainWindow(QMainWindow):
         self.open_dataframe_in_excel(pivot_df)
         QMessageBox.information(self, "Information.", "Data of the number of authorized users has been generated.")
 
+    def scanned_by_year(self):
+        """Scanned users by year - call server method directly"""
+        self.data_service.scanned_users_by_year()
+
+    def scans_products_by_year(self):
+        """Scans products by year - calls server method directly"""
+        self.data_service.scans_products_by_year()
+
+    def top_users_by_scans(self):
+        """Top users by scans - call server method directly"""
+        self.data_service.top_users_by_scans()
+        
     def parse_date(self, prompt_title, prompt_text):
         """Helper to parse date from user input"""
 
