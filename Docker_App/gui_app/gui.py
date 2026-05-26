@@ -2,6 +2,8 @@ import os
 import tempfile
 import subprocess
 import sys
+import inspect
+
 
 import pandas as pd
 from datetime import datetime
@@ -10,7 +12,7 @@ from functools import wraps
 from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QInputDialog, QWidget, QVBoxLayout
 from PyQt5.QtGui import QIcon, QPixmap, QFont
 
-from Docker_App.server_app.server import DatabaseService
+from server_app.server import DatabaseService
 
 import logging
 
@@ -25,7 +27,16 @@ def for_data_about_users(func):
         if df is None or df.empty:
             logging.warning("Warning! After cleaning database is empty. Data about users cannot be generated.")
             QMessageBox.warning(self, "Warning!", "After cleaning database is empty.")
-            return
+            return pd.DataFrame()
+        
+        # Check function signature to handle Qt signal arguments
+        sig = inspect.signature(func)
+        accepts_var_pos = any(p.kind == p.VAR_POSITIONAL for p in sig.parameters.values())
+        if accepts_var_pos or len(sig.parameters) > 2:
+            return func(self, df, *args, **kwargs)
+        else:
+            # Ignore extra arguments from Qt signals
+            return func(self, df)
         
         return func(self, df, *args, **kwargs)
     
@@ -44,7 +55,15 @@ def for_data_about_scans(func):
             QMessageBox.warning(self, "Warning!", "Database about scans is empty.")
             return
 
-        return func(self, df, *args, **kwargs)
+        # Check function signature to handle Qt signal arguments
+        sig = inspect.signature(func)
+        accepts_var_pos = any(p.kind == p.VAR_POSITIONAL for p in sig.parameters.values())
+        if accepts_var_pos or len(sig.parameters) > 2:
+            return func(self, df, *args, **kwargs)
+        else:
+            # Ignore extra arguments from Qt signals
+            return func(self, df)
+    
     return wrapper
 
 class MainWindow(QMainWindow):
@@ -58,13 +77,13 @@ class MainWindow(QMainWindow):
         
         self.resize(620, 600)
         self.setWindowTitle("Данные по пользователя и сканам в приложении AXOR")
-        self.setWindowIcon(QIcon('Pictures/axor.ico'))
+        self.setWindowIcon(QIcon('Docker_App/Pictures/axor.ico'))
 
         self.label = QLabel()
-        self.label.setPixmap(QPixmap('Pictures/axor_logo.png'))
+        self.label.setPixmap(QPixmap('Docker_App/Pictures/axor_logo.png'))
 
         self.btn_about_users = QPushButton("All users", self)
-        self.btn_about_users.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
+        self.btn_about_users.setFont(QFont('Docker_App/Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
         self.btn_about_users.clicked.connect(self.all_users)
 
         self.btn_users_by_country = QPushButton("Users by country", self)
@@ -190,17 +209,29 @@ class MainWindow(QMainWindow):
         self.open_dataframe_in_excel(pivot_df)
         QMessageBox.information(self, "Information.", "Data of the number of authorized users has been generated.")
 
-    def scanned_by_year(self):
+    def scanned_users_by_year(self):
         """Scanned users by year - call server method directly"""
 
         df_scanned_users_by_year_pivot_df = self.data_service.scanned_users_by_year()
+        
+        if df_scanned_users_by_year_pivot_df is None or df_scanned_users_by_year_pivot_df.empty:
+            QMessageBox.warning(self, "Attention!", "Data about scanned users by year is empty.")
+            return
+        
         self.open_dataframe_in_excel(df_scanned_users_by_year_pivot_df)
+        QMessageBox.information(self, "Information", "Data about scanned users by year has been generated.")
 
     def scans_products_by_year(self):
         """Scans products by year - calls server method directly"""
         
         df_scans_products_by_year_pivot_df = self.data_service.scans_products_by_year()
+        
+        if df_scans_products_by_year_pivot_df is None or df_scans_products_by_year_pivot_df.empty:
+            QMessageBox.warning(self, "Attention!", "Data about scans and points by year is empty.")
+            return
+        
         self.open_dataframe_in_excel(df_scans_products_by_year_pivot_df)
+        QMessageBox.information(self, "Information", "Data about scans and points by year has been generated.")
 
     def top_users_by_scans(self):
         """Top users by scans - call server method directly"""

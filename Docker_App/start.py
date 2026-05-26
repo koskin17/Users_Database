@@ -6,7 +6,7 @@ import logging
 
 load_dotenv()
 
-from Docker_App.server_app.server import MainWindow
+from gui_app.gui import MainWindow
 
 logging.basicConfig(
     filename=  "app.log",
