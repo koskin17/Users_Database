@@ -6,10 +6,6 @@ import pandas as pd
 from datetime import datetime
 
 from psycopg2.pool import SimpleConnectionPool
-from typing import Optional
-
-from Docker_App.server_app.decorators import for_data_about_users, for_data_about_scans
-
 
 class DatabaseService:
 
@@ -156,101 +152,6 @@ class DatabaseService:
         self.df_scans = df
         return df
 
-    @for_data_about_users
-    def all_users(self, df):
-        """Getting information about all users in the database"""
-        self.open_dataframe_in_excel(df)
-
-    @for_data_about_users
-    def users_by_country(self, df):
-        """General statistics about users by countries."""
-        users_by_countries = df.groupby(["country_name", "user_type"]).size().reset_index(name='count')
-        self.open_dataframe_in_excel(users_by_countries)
-
-    @for_data_about_users
-    def last_authorization_in_app(self, df):
-        """Quantity of authorized users by years with group by country and type of user"""
-        
-        df["Year"] = df["last_authorization"].dt.year.fillna(0).astype(int)
-
-        df_grouped = (
-            df[df["Year"] != 0].groupby(["country_name", "user_type", "Year"]).size().reset_index(name="user_count")
-        )
-
-        pivot_df = df_grouped.pivot_table(
-            index = ["country_name", "user_type"],
-            columns = "Year",
-            values = "user_count",
-            fill_value = 0
-        ).reset_index()
-
-        self.open_dataframe_in_excel(pivot_df)
-
-    def parse_date(self, prompt_title, prompt_text):
-        """Helper to parse date from user input"""
-
-        date_str, ok = QInputDialog.getText(self, prompt_title, prompt_text)
-        if not ok or not date_str:
-            return None
-        try:
-            return datetime.strptime(date_str, "%d.%m.%Y")
-        except ValueError:
-            logging.error("Invalid date format entered by user", exc_info = True)
-            return None
-
-    @for_data_about_users
-    def authorization_during_period(self, df):
-        """Information about the amount of authorized users for the period"""
-        
-        start_date = self.parse_date("Beginning of the period:", "Specify the beginning of the period in the format dd.mm.yyyy (separated by a dot):")
-        if start_date is None:
-            logging.error("Start date is not valid. Authorization during period cannot be calculated.", exc_info = True)
-            return
-        
-        end_date = self.parse_date("End of a period:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
-        if end_date is None:
-            logging.error("End date is not valid. Authorization during period cannot be calculated.", exc_info = True)
-            return
-
-        if end_date < start_date:
-            logging.error("End date is greated or equals start date. Authorization during period cannot be calculated.", exc_info = True)
-            return
-        
-        mask_for_filter = (df["last_authorization"].dt.date >= start_date.date()) & (df["last_authorization"].dt.date <= end_date.date())
-        df_period = df[mask_for_filter]
-        
-        grouped = df_period.groupby(["country_name", "user_type"]).size().reset_index(name="authorized_count")
-        total = grouped["authorized_count"].sum()
-        total_row = pd.DataFrame([{
-                "country_name": "TOTAL",
-                "user_type": "",
-                "authorized_count": total
-            }])
-        grouped = pd.concat([grouped, total_row], ignore_index=True)
-
-        self.show_dataframe(grouped, "Information of the number of authorized users for the period has been generated.")
-
-    @for_data_about_users
-    def points_by_users_and_countries(self, df):
-        """ Information about current sum of points by users and countries """
-    
-        grouped = (df.groupby(["country_name", "user_type"])["points"].sum().reset_index(name="sum_points"))
-
-        total_points = grouped["sum_points"].sum()
-        total_row = pd.DataFrame([{
-                "country_name": "TOTAL",
-                "user_type": "",
-                "sum_points": total_points
-            }])
-        grouped = pd.concat([grouped, total_row], ignore_index=True)
-
-        self.open_dataframe_in_excel(grouped)
-        
-    @for_data_about_scans
-    def all_scans(self, df):
-        """Information about all scans in the database"""
-        self.open_dataframe_in_excel(df)
-
     def scanned_users_by_year(self):
         """Information about the number of scanning users by year, country, and user type
         
@@ -309,7 +210,7 @@ class DatabaseService:
         
         if df_scanned_users_by_year is None or df_scanned_users_by_year.empty:
             logging.error("Data about scanning users by year is empty after query execution.", exc_info = True)
-            return
+            return pd.DataFrame()
         
         df_scanned_users_by_year_pivot_df = (
             df_scanned_users_by_year.pivot_table(
@@ -320,7 +221,7 @@ class DatabaseService:
             ).reset_index()
         )
             
-        self.open_dataframe_in_excel(df_scanned_users_by_year_pivot_df)
+        return df_scanned_users_by_year_pivot_df
 
     def scans_products_by_year(self): 
         """Data about scans and sum of points of products by country, user type, year """
@@ -345,6 +246,7 @@ class DatabaseService:
         df_scans_products_by_year = self.query_to_dataframe(query_scans_products_by_year)
         if df_scans_products_by_year is None or df_scans_products_by_year.empty:
             logging.error("Data about scans and points of products by year is empty after query execution", exc_info = True)
+            return pd.DataFrame()
 
         df_scans_products_by_year_pivot_df = (
             df_scans_products_by_year.pivot_table(
@@ -360,36 +262,7 @@ class DatabaseService:
             for col in df_scans_products_by_year_pivot_df.columns.values
         ]
 
-        self.open_dataframe_in_excel(df_scans_products_by_year_pivot_df)
-
-    @for_data_about_scans
-    def data_about_scans_during_period(self, df):
-        """Data about number of users and scans during period"""
-
-        start_date = self.parse_date(
-                "Period start",
-                "Enter the period start in dd.mm.yyyy (separated by dot):"
-            )
-        if start_date is None:
-            logging.error("Start date is not valid. Data about scans during period cannot be generated.", exc_info = True)
-            return
-
-        end_date = self.parse_date(
-            "End of period",
-            "Enter the end of the period in dd.mm.yyyy (separated by dot):"
-        )
-        if end_date is None:
-            logging.error("End date is not valid. Data about scans during period cannot be generated.", exc_info = True)
-            return
-
-        if end_date < start_date:
-            logging.error("End date is before start date. Data about scans during period cannot be generated.")
-            return
-    
-        mask_for_filter = (df["created_at"].dt.date >= start_date.date()) & (df["created_at"].dt.date <= end_date.date())
-        df_data_about_scans_during_period = df[mask_for_filter]
-
-        self.open_dataframe_in_excel(df_data_about_scans_during_period)
+        return df_scans_products_by_year_pivot_df
 
     def top_users_by_scans(self):
         """ TOP dealers / adjusters by scans"""
@@ -444,27 +317,15 @@ class DatabaseService:
         
         df_top_users = self.query_to_dataframe(top_users_by_scans_query)
 
-        self.open_dataframe_in_excel(df_top_users)
+        return df_top_users
 
     def close_db_connection(self):
-        """ Closing connection to database """
-
+        """Close database connection pool"""
+        
         if self.db_pool:
             try:
+                logging.info("Closing database connection pool...")
                 self.db_pool.closeall()
+                logging.info("Database connection pool closed successfully")
             except Exception as e:
-                logging.error("Error closing database connections", exc_info = True)
-
-    def closeEvent(self, event):
-        """Handle window close event"""
-
-        try:
-            self.close_db_connection()
-        except Exception as e:
-            logging.error("Error during application shutdown", exc_info = True)
-
-        try:
-            event.accept()
-        except Exception as e:
-            logging.error("Error accepting close event", exc_info = True)
-    
+                logging.error("Erro closing database connection pool", exc_info = True)

@@ -141,7 +141,7 @@ class MainWindow(QMainWindow):
 
         if df is None or df.empty:
             QMessageBox.warning(self, "Attention!", "DataFrame is empty.")
-            return
+            return pd.DataFrame()
         
         try:
             with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
@@ -192,15 +192,21 @@ class MainWindow(QMainWindow):
 
     def scanned_by_year(self):
         """Scanned users by year - call server method directly"""
-        self.data_service.scanned_users_by_year()
+
+        df_scanned_users_by_year_pivot_df = self.data_service.scanned_users_by_year()
+        self.open_dataframe_in_excel(df_scanned_users_by_year_pivot_df)
 
     def scans_products_by_year(self):
         """Scans products by year - calls server method directly"""
-        self.data_service.scans_products_by_year()
+        
+        df_scans_products_by_year_pivot_df = self.data_service.scans_products_by_year()
+        self.open_dataframe_in_excel(df_scans_products_by_year_pivot_df)
 
     def top_users_by_scans(self):
         """Top users by scans - call server method directly"""
-        self.data_service.top_users_by_scans()
+
+        df_top_users = self.data_service.top_users_by_scans()
+        self.open_dataframe_in_excel(df_top_users)
         
     def parse_date(self, prompt_title, prompt_text):
         """Helper to parse date from user input"""
@@ -311,3 +317,15 @@ class MainWindow(QMainWindow):
 
         self.open_dataframe_in_excel(df_data_about_scans_during_period)
         QMessageBox.information(self, "Information", "Data about scans during period has been generated.")
+    
+    def closeEvent(self, event):
+        """Handle window close event - called automatically when closing the window"""
+
+        try:
+            logging.info("Cleaning up all resourses ans closing database connection...")
+            self.data_service.close_db_connection()
+            logging.info("Database connection closed.")
+        except Exception as e:
+            logging.info("Error during closing application", exc_info = True)
+        
+        event.accept()
