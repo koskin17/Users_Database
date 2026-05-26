@@ -4,6 +4,9 @@ FROM python:3.10-slim
 # Working directory inside the container
 WORKDIR /app
 
+# Copy only server's path
+COPY /server_app ./server_app
+
 # Copy the requirements file and install dependencies
 COPY requirements.txt .
 
@@ -20,4 +23,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Run the application
-CMD ["python", "start.py"]
+CMD ["python", "server_app/server.py"]

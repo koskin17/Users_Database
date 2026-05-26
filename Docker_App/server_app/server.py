@@ -7,6 +7,9 @@ from datetime import datetime
 
 from psycopg2.pool import SimpleConnectionPool
 
+print("DB_USER", os.getenv("DB_USER"))  #TODO delete after testing
+print("DB_PASSWORD", os.getenv("DB_PASSWORD"))  #TODO delete after testing
+
 class DatabaseService:
 
     def __init__(self):
