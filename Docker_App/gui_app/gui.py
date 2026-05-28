@@ -179,8 +179,11 @@ class MainWindow(QMainWindow):
     @for_data_about_users
     def users_by_country(self, df):
         """General statistics about users by countries."""
+
+        logging.info("Method users_by_country was called and %d rows were returned.", len(df))
         users_by_countries = df.groupby(["country_name", "user_type"]).size().reset_index(name='count')
         self.open_dataframe_in_excel(users_by_countries)
+        QMessageBox.information(self, "Information", "Data about users by country has been generated.")
 
     @for_data_about_users
     def last_authorization_in_app(self, df):
