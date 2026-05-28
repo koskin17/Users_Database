@@ -3,26 +3,40 @@ import tempfile
 import subprocess
 import sys
 import inspect
+import logging
 
 import requests
 import pandas as pd
 from datetime import datetime
 from functools import wraps
-import logging
 
 from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QInputDialog, QWidget, QVBoxLayout
 from PyQt5.QtGui import QIcon, QPixmap, QFont
 
+import logging
+
+logging.basicConfig(
+    filename=  "app.log",
+    filemode = "a",
+    format = "%(asctime)s - %(levelname)s - %(message)s",
+    level = logging.INFO
+)
 
 def for_data_about_users(func):
-    """Decorator for loading and cleaning user data"""
+    """Decorator for loading and cleaning data about users"""
 
     @wraps(func)
     def wrapper(self, *args, **kwargs):
 
-        response = requests.get("http://localhost:8000/users")
-        data = response.json()
-        df = pd.DataFrame(data)
+        try:
+            logging.info("Sending request to FastAPI /users endpoint...")
+            response = requests.get("http://localhost:8000/users")
+            data = response.json()
+            df = pd.DataFrame(data)
+        except Exception as e:
+            logging.error("Failed to request /users endpoint", exc_info = True)
+            QMessageBox.warning(self, "Error", "Failed to connect to server.")
+            return pd.DataFrame()
 
         if df is None or df.empty:
             logging.warning("Warning! After cleaning database is empty. Data about users cannot be generated.")
@@ -81,7 +95,7 @@ class MainWindow(QMainWindow):
         self.label.setPixmap(QPixmap('Docker_App/gui_app/Pictures/axor_logo.png'))
 
         self.btn_about_users = QPushButton("All users", self)
-        self.btn_about_users.setFont(QFont('Docker_App/gui_app/Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
+        self.btn_about_users.setFont(QFont('Docker_App/Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
         self.btn_about_users.clicked.connect(self.all_users)
 
         self.btn_users_by_country = QPushButton("Users by country", self)
@@ -132,17 +146,6 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(container)
 
-    def load_data_about_scans(self, force_reload: bool = False):
-        """Load and cache scan data from database service"""
-        if not force_reload and self.df_scans is not None and not self.df_scans.empty:
-            logging.info("Using cached scan data.")
-            return self.df_scans
-
-        response = requests.get("http:/localhost:8000/scans")
-        data = response.json()
-        df = pd.DataFrame(data)
-        return df
-
     def open_dataframe_in_excel(self, df):
         """Open DataFrame in Excel using a temporary file."""
 
@@ -167,15 +170,15 @@ class MainWindow(QMainWindow):
 
     @for_data_about_users
     def all_users(self, df):
-        """Information about all users in database"""
+        """Getting information about all users in the database"""
 
-        logging.info("Method all_users was called and %d rows were returned", len(df))
+        logging.info("Method all_users was called and %d rows were returned.", len(df))
         self.open_dataframe_in_excel(df)
+        QMessageBox.information(self, "Information", "Data about all users has been generated.")
 
     @for_data_about_users
     def users_by_country(self, df):
         """General statistics about users by countries."""
-        
         users_by_countries = df.groupby(["country_name", "user_type"]).size().reset_index(name='count')
         self.open_dataframe_in_excel(users_by_countries)
 
@@ -343,7 +346,10 @@ class MainWindow(QMainWindow):
         """Handle window close event - called automatically when closing the window"""
 
         try:
-            logging.info("Closing application...")
+            logging.info("Cleaning up all resourses ans closing database connection...")
+            self.data_service.close_db_connection()
+            logging.info("Database connection closed.")
         except Exception as e:
-            logging.info("Error during closing application", exc_info = True)    
+            logging.info("Error during closing application", exc_info = True)
+        
         event.accept()
