@@ -189,6 +189,9 @@ class MainWindow(QMainWindow):
     def last_authorization_in_app(self, df):
         """Quantity of authorized users by years with group by country and type of user"""
         
+        logging.info("Method last_authorization_in_app was called and %d rows were returned.", len(df))
+
+        df["last_authorization"] = pd.to_datetime(df["last_authorization"], errors = "coerce")        
         df["Year"] = df["last_authorization"].dt.year.fillna(0).astype(int)
 
         df_grouped = (
@@ -203,6 +206,7 @@ class MainWindow(QMainWindow):
         ).reset_index()
 
         self.open_dataframe_in_excel(pivot_df)
+        logging.info("Data of the number of authorized users has been generated and %d were returned.")
         QMessageBox.information(self, "Information.", "Data of the number of authorized users has been generated.")
 
     def scanned_users_by_year(self):
