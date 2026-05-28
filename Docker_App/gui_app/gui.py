@@ -212,14 +212,28 @@ class MainWindow(QMainWindow):
     def scanned_users_by_year(self):
         """Scanned users by year - call server method directly"""
 
-        df_scanned_users_by_year_pivot_df = self.data_service.scanned_users_by_year()
-        
-        if df_scanned_users_by_year_pivot_df is None or df_scanned_users_by_year_pivot_df.empty:
-            QMessageBox.warning(self, "Attention!", "Data about scanned users by year is empty.")
-            return
-        
-        self.open_dataframe_in_excel(df_scanned_users_by_year_pivot_df)
-        QMessageBox.information(self, "Information", "Data about scanned users by year has been generated.")
+        try:
+            logging.info("Sending request to FastAPI /scanned_users_by_year endpoint...")
+            response = requests.get("http://localhost:8000/scanned_users_by_year")
+
+            if response.status_code != 200:
+                logging.error("Server returned error %d: %s", response.status_code, response.text)
+                QMessageBox.warning(self, "Error", f"Server error: {response.status_code}")
+                return pd.DataFrame()
+
+            data = response.json()
+            df = pd.DataFrame(data)
+
+            if df.empty:
+                QMessageBox.warning(self, "Attention!", "Data about scanned users by year is empty.")
+                return pd.DataFrame()
+            
+            self.open_dataframe_in_excel(df)
+            logging.info("Data about scanned users by year has been generated and %d rows were returned.")
+            QMessageBox.information(self, "Information", "Data about scanned users by year has been generated.")
+        except Exception as e:
+            logging.error("Failed to reauest scanned users by year", exc_info = True)
+            QMessageBox.warning(self, "Error", "Failed to connect to server.")
 
     def scans_products_by_year(self):
         """Scans products by year - calls server method directly"""

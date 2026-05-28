@@ -19,3 +19,8 @@ def home():
 def get_users():
     df = db.load_and_clean_users()
     return df.to_dict(orient = "records")
+
+@app.get("/scanned_users_by_year")
+def get_scanned_users_by_year():
+    df = db.scanned_users_by_year()
+    return df.to_dict(orient = "records")
