@@ -333,19 +333,28 @@ class MainWindow(QMainWindow):
             logging.error("End date is greated or equals start date. Authorization during period cannot be calculated.", exc_info = True)
             return None
         
-        mask_for_filter = (df["last_authorization"].dt.date >= start_date.date()) & (df["last_authorization"].dt.date <= end_date.date())
-        df_period = df[mask_for_filter]
-        
-        grouped = df_period.groupby(["country_name", "user_type"]).size().reset_index(name="authorized_count")
-        total = grouped["authorized_count"].sum()
-        total_row = pd.DataFrame([{
-                "country_name": "TOTAL",
-                "user_type": "",
-                "authorized_count": total
-            }])
-        grouped = pd.concat([grouped, total_row], ignore_index=True)
+        try:
+            response = requests.get("http://localhost:8000/authorization_during_period",
+                                    params = {"start_date": start_date.strftime("%d.%m.%Y"), "end_date": end_date.strftime("%d.%m.%Y")})
+            if response.status_code != 200:
+                logging.error("Server returned error %d: %s", response.status_code, response.text)
+                QMessageBox.warning(self, "Error!", f"Server error: {response.status_code}")
+                return None
+            
+            data = response.json()
+            df = pd.DataFrame(data)
 
-        self.show_dataframe(grouped, "Information of the number of authorized users for the period has been generated.")
+            if df.empty:
+                QMessageBox.warning(self, "Attention!", "No authorized users found for the selected period.")
+                return None
+            
+            self.open_dataframe_in_excel(df)
+            logging.info("Authorization during period data generated (%d rows).", len(df))
+            QMessageBox.information(self, "Information", "Information of the number of authorized users for the period has been generated.")
+
+        except Exception as e:
+            logging.error("Failed to request authorization during period", exc_info = True)
+            QMessageBox.warning(self, "Error", "Failed to connect to server.")
 
     @for_data_about_users
     def points_by_users_and_countries(self, df):
