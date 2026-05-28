@@ -346,9 +346,7 @@ class MainWindow(QMainWindow):
         """Handle window close event - called automatically when closing the window"""
 
         try:
-            logging.info("Cleaning up all resourses ans closing database connection...")
-            self.data_service.close_db_connection()
-            logging.info("Database connection closed.")
+            logging.info("Closing application...")
         except Exception as e:
             logging.info("Error during closing application", exc_info = True)
         
