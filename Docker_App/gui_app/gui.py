@@ -303,17 +303,6 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Attention!", "The entered date is incorrect! Format: dd.mm.yyyy")
             return None
 
-    # def show_dataframe(self, df, message=None):   #TODO delete after tests
-    #     """Helper to show DataFrame in Excel and show message"""
-
-    #     if df is None or df.empty:
-    #         logging.error("DataFrame is empty.")
-    #         QMessageBox.warning(self, "Attention!", "DataFrame is empty.")
-    #         return
-    #     self.open_dataframe_in_excel(df)
-    #     if message:
-    #         QMessageBox.information(self, "Information", message)
-
     @for_data_about_users
     def authorization_during_period(self, df):
         """Information about the amount of authorized users for the period"""
