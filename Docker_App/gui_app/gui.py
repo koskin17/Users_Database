@@ -114,8 +114,7 @@ class MainWindow(QMainWindow):
         self.btn_about_scans.setFont(QFont('Font/pfdintextpro-thinitalic.ttf', 14, 50, False))
         self.btn_about_scans.clicked.connect(self.all_scans)
 
-        self.btn_scanned_users_by_year = QPushButton(
-            "Scanned users by year", self)
+        self.btn_scanned_users_by_year = QPushButton("Scanned users by year", self)
         self.btn_scanned_users_by_year.clicked.connect(self.scanned_users_by_year)
 
         self.btn_scans_products_by_year = QPushButton("Data about scans and sum of point by year", self)
@@ -219,33 +218,47 @@ class MainWindow(QMainWindow):
             if response.status_code != 200:
                 logging.error("Server returned error %d: %s", response.status_code, response.text)
                 QMessageBox.warning(self, "Error", f"Server error: {response.status_code}")
-                return pd.DataFrame()
+                return None
 
             data = response.json()
             df = pd.DataFrame(data)
 
             if df.empty:
                 QMessageBox.warning(self, "Attention!", "Data about scanned users by year is empty.")
-                return pd.DataFrame()
+                return None
             
             self.open_dataframe_in_excel(df)
             logging.info("Data about scanned users by year has been generated and %d rows were returned.")
             QMessageBox.information(self, "Information", "Data about scanned users by year has been generated.")
         except Exception as e:
-            logging.error("Failed to reauest scanned users by year", exc_info = True)
+            logging.error("Failed to request scanned users by year", exc_info = True)
             QMessageBox.warning(self, "Error", "Failed to connect to server.")
 
     def scans_products_by_year(self):
         """Scans products by year - calls server method directly"""
-        
-        df_scans_products_by_year_pivot_df = self.data_service.scans_products_by_year()
-        
-        if df_scans_products_by_year_pivot_df is None or df_scans_products_by_year_pivot_df.empty:
-            QMessageBox.warning(self, "Attention!", "Data about scans and points by year is empty.")
-            return
-        
-        self.open_dataframe_in_excel(df_scans_products_by_year_pivot_df)
-        QMessageBox.information(self, "Information", "Data about scans and points by year has been generated.")
+
+        try:
+            logging.info("Sending request to FastAPI /scans_products_by_year endpoint...")
+            response = requests.get("http://localhost:8000/scans_products_by_year")
+
+            if response.status_code != 200:
+               logging.error("Server returned error %d: %s", response.status_code, response.text)
+               QMessageBox.warning(self, "Error", f"Server error: {response.status_code}")
+               return None
+
+            data = response.json()
+            df = pd.DataFrame(data)
+
+            if df.empty:
+                QMessageBox.warning(self, "Attention!", "Data about scanned products by year is empty.")
+                return None
+
+            self.open_dataframe_in_excel(df)
+            logging.info("Data about scanned products by year has been generated and %d rows were returned.", len(df))
+            QMessageBox.information(self, "Information", "Data about scanned products by year has been generated.")
+        except Exception as e:
+            logging.error("Failed to request scanned products by year", exc_info = True)
+            QMessageBox.warning(self, "Error", "Failed to connect to server.")
 
     def top_users_by_scans(self):
         """Top users by scans - call server method directly"""
