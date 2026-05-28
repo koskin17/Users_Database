@@ -29,3 +29,8 @@ def get_scanned_users_by_year():
 def scans_products_by_year():
     df = db.scans_products_by_year()
     return df.to_dict(orient="records")
+
+@app.get("/top_users_by_scans")
+def top_users_by_scans():
+    df = db.top_users_by_scans()
+    return df.to_dict(orient="records")

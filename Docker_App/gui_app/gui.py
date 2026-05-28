@@ -263,8 +263,32 @@ class MainWindow(QMainWindow):
     def top_users_by_scans(self):
         """Top users by scans - call server method directly"""
 
-        df_top_users = self.data_service.top_users_by_scans()
-        self.open_dataframe_in_excel(df_top_users)
+        try:
+            logging.info("Sending request to FastAPI /top_users_by_scans endpoint...")
+            response = requests.get("http:localhost:8000/top_users_by_scans")
+
+            if response.status_code != 200:
+                logging.error("Server returned error %d: %s", response.status_code, response.text)
+                QMessageBox.warning(self, "Error", f"Server error: {response.status_code}")
+                return None
+            
+            data = response.json()
+            df = pd.DataFrame(data)
+
+            if df.empty:
+                QMessageBox.warning(self, "Attention!", "Data about TOP users by scans is empty.")
+                return None
+
+            self.open_dataframe_in_excel(df)
+            logging.info("Information about TOP users by scans has been generated and  %d rows were returned.", len(df))
+            QMessageBox.information(self, "Information", "Information about TOP users by scans has been generated.")
+        except Exception as e:
+            logging.error("Failed to request TOP users by scans", exc_info = True)
+            QMessageBox.warning(self, "Error!", "Failed to connect to server.")
+
+
+        # df_top_users = self.data_service.top_users_by_scans()
+        # self.open_dataframe_in_excel(df_top_users)
         
     def parse_date(self, prompt_title, prompt_text):
         """Helper to parse date from user input"""
