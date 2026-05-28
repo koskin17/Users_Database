@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from server_app.server import DatabaseService
+from datetime import datetime
+import pandas as pd
 
 from dotenv import load_dotenv
 import os
@@ -34,3 +36,20 @@ def scans_products_by_year():
 def top_users_by_scans():
     df = db.top_users_by_scans()
     return df.to_dict(orient="records")
+
+@app.get("/authorization_during_period")
+def authorization_during_period(start_date: str, end_date: str):
+    df = db.load_and_clean_users()
+    df["last_authorization"] = pd.to_datetime(df["last_authorization"], errors = "coerce")
+
+    start = datetime.strptime(start_date, "%d.%m.%Y")
+    end = datetime.strptime(end_date, "%d.%m.%Y")
+
+    mask = (df["last_authorization"].dt.date >= start.date()) & (df["last_authorization"].dt.date <= end.date())
+    df_period = df[mask]
+
+    grouped = df_period.groupby(["country_name", "user_type"]).size().reset_index(name = "authorized_count")
+    total = grouped["authorized_count"].sum()
+    grouped = pd.concat([grouped, pd.DataFrame([{"country_name": "TOTAL", "user_type": "", "authorized_count": total}])])
+
+    return grouped.to_dict(orient = "records")

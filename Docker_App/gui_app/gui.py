@@ -303,16 +303,16 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Attention!", "The entered date is incorrect! Format: dd.mm.yyyy")
             return None
 
-    def show_dataframe(self, df, message=None):
-        """Helper to show DataFrame in Excel and show message"""
+    # def show_dataframe(self, df, message=None):   #TODO delete after tests
+    #     """Helper to show DataFrame in Excel and show message"""
 
-        if df is None or df.empty:
-            logging.error("DataFrame is empty.")
-            QMessageBox.warning(self, "Attention!", "DataFrame is empty.")
-            return
-        self.open_dataframe_in_excel(df)
-        if message:
-            QMessageBox.information(self, "Information", message)
+    #     if df is None or df.empty:
+    #         logging.error("DataFrame is empty.")
+    #         QMessageBox.warning(self, "Attention!", "DataFrame is empty.")
+    #         return
+    #     self.open_dataframe_in_excel(df)
+    #     if message:
+    #         QMessageBox.information(self, "Information", message)
 
     @for_data_about_users
     def authorization_during_period(self, df):
@@ -321,17 +321,17 @@ class MainWindow(QMainWindow):
         start_date = self.parse_date("Beginning of the period:", "Specify the beginning of the period in the format dd.mm.yyyy (separated by a dot):")
         if start_date is None:
             logging.error("Start date is not valid. Authorization during period cannot be calculated.", exc_info = True)
-            return
+            return None
         
         end_date = self.parse_date("End of a period:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
         if end_date is None:
             logging.error("End date is not valid. Authorization during period cannot be calculated.", exc_info = True)
-            return
+            return None
 
         if end_date < start_date:
             QMessageBox.warning(self, "Warning!", "End date must be greater than start date.")
             logging.error("End date is greated or equals start date. Authorization during period cannot be calculated.", exc_info = True)
-            return
+            return None
         
         mask_for_filter = (df["last_authorization"].dt.date >= start_date.date()) & (df["last_authorization"].dt.date <= end_date.date())
         df_period = df[mask_for_filter]
