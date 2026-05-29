@@ -55,7 +55,8 @@ def authorization_during_period(start_date: str, end_date: str):
     return grouped.to_dict(orient = "records")
 
 @app.get("/points_by_users_and_countries")
-def points_by_users_and_countries()
+def points_by_users_and_countries():
+    
     df = db.load_and_clean_users()
 
     grouped = (df.groupby(["country_name", "user_type"])["points"].sum().reset_index(name="sum_points"))
