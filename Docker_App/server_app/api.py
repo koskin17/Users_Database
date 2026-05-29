@@ -69,4 +69,4 @@ def points_by_users_and_countries():
         }])
     grouped = pd.concat([grouped, total_row], ignore_index=True)
 
-    return grouped
+    return grouped.to_dict(orient = "records")
