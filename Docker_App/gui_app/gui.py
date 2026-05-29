@@ -60,13 +60,21 @@ def for_data_about_scans(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
 
-        df = self.load_data_about_scans()
+        try:
+            logging.info("Sending request to FastAPI /all_scans endpoint...")
+            response = requests.get("http://localhost:8000/all_scans")
+            data = response.json()
+            df = pd.DataFrame(data)
+        except Exception as e:
+            logging.error("Failed to request /all_scans endpoint", exc_info = True)
+            QMessageBox.warning(self, "Error", "Failed to connect to server.")
+            return pd.DataFrame()
 
         if df is None or df.empty:
-            logging.warning("Warning! Database about scans is empty. Data about scans generated cannot be generated.")
-            QMessageBox.warning(self, "Warning!", "Database about scans is empty.")
-            return
-
+            logging.warning("Warning! Database about all scans is empty.")
+            QMessageBox.warning(self, "Warning!", "Database about all scans is empty.")
+            return pd.DataFrame()
+        
         # Check function signature to handle Qt signal arguments
         sig = inspect.signature(func)
         accepts_var_pos = any(p.kind == p.VAR_POSITIONAL for p in sig.parameters.values())
@@ -354,7 +362,7 @@ class MainWindow(QMainWindow):
             response = requests.get("http://localhost:8000/points_by_users_and_countries")
 
             if response.status_code != 200:
-                logging.error("Server returned error %d: %s", response.status_code, response.text)
+                logging.error("Server returned error %d: %s", response.status_code, response.text, exc_info = True)
                 QMessageBox.warning(self, "Error!", f"Server error: {response.status_code}")
                 return None
             

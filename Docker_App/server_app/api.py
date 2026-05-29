@@ -74,4 +74,7 @@ def points_by_users_and_countries():
 @app.get("/all_scans")
 def all_scans():
     df = db.load_data_about_scans()
-    return df.to_dict(orient = "records")
+    df = df.where(pd.notnull(df), None) #change NaN to None
+    df = df.astype(object)
+    df = df.fillna(value = None)
+    return df.astype(object).to_dict(orient = "records")
