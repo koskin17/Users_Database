@@ -78,3 +78,20 @@ def all_scans():
     df = df.astype(object)
     df = df.fillna(value = None)
     return df.astype(object).to_dict(orient = "records")
+
+@app.get("/data_about_scans_during_period")
+def data_about_scans_during_period(start_date: str, end_date: str):
+    df = db.load_data_about_scans()
+
+    df["created_at"] = pd.to_datetime(df["created_at"], errors = "coerce")
+
+    start = datetime.strptime(start_date, "%d.%m.%Y")
+    end = datetime.strptime(end_date, "%d.%m.%Y")
+
+    mask = (df["created_at"].dt.date >= start.date()) & (df["created_at"].dt.date <= end.date())
+    
+    df_data_about_scans_during_period = df[mask]
+
+    return df_data_about_scans_during_period.to_dict(orient = "records")
+
+

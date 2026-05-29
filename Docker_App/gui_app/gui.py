@@ -315,18 +315,18 @@ class MainWindow(QMainWindow):
     def authorization_during_period(self, df):
         """Information about the amount of authorized users for the period"""
         
-        start_date = self.parse_date("Beginning of the period:", "Specify the beginning of the period in the format dd.mm.yyyy (separated by a dot):")
+        start_date = self.parse_date("Period start:", "Enter the period start in dd.mm.yyyy (separated by dot):")
         if start_date is None:
             logging.error("Start date is not valid. Authorization during period cannot be calculated.", exc_info = True)
             return None
         
-        end_date = self.parse_date("End of a period:", "Specify the end of the period in the format dd.mm.yyyy (separated by a dot):")
+        end_date = self.parse_date("End of a period:", "Enter the end of the period in dd.mm.yyyy (separated by dot):")
         if end_date is None:
             logging.error("End date is not valid. Authorization during period cannot be calculated.", exc_info = True)
             return None
 
         if end_date < start_date:
-            QMessageBox.warning(self, "Warning!", "End date must be greater than start date.")
+            QMessageBox.warning(self, "Warning!", "End date must be the same or after start date.")
             logging.error("End date is greated or equals start date. Authorization during period cannot be calculated.", exc_info = True)
             return None
         
@@ -409,12 +409,28 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Attention!", "End date must be the same or after start date.")
             logging.error("End date is before start date. Data about scans during period cannot be generated.")
             return
-    
-        mask_for_filter = (df["created_at"].dt.date >= start_date.date()) & (df["created_at"].dt.date <= end_date.date())
-        df_data_about_scans_during_period = df[mask_for_filter]
 
-        self.open_dataframe_in_excel(df_data_about_scans_during_period)
-        QMessageBox.information(self, "Information", "Data about scans during period has been generated.")
+        try:
+            response = requests.get("http://localhost:8000/data_about_scans_during_period", params = {"start_date": start_date.strftime("%d.%m.%Y"), "end_date": end_date.strftime("%d.%m.%Y")})
+
+            if response.status_code != 200:
+                logging.error("Server retured error %d: %s", response.status_code, response.text? exc_info = True)
+                QMessageBox.warning(self, "Error!", f"Servet error: {response.status_code}")
+                return None
+            
+            data = response.json()
+            df = pd.DataFrame(data)
+
+            if df.empty:
+                QMessageBox.warning(self, "Attention!", "No data about scans during period.")
+                return None
+            
+            self.open_dataframe_in_excel(df)
+            logging.info("Data about scans during period generated (%d rows).", len(df))
+            QMessageBox.information(self, "Information", "Data about scans during period has been generated.")
+        except Exception as e:
+            logging.error("Failed to request scans during period.", exc_info = True)
+            QMessageBox.warning(self, "Error", "Failed to connect to server.")
     
     def closeEvent(self, event):
         """Handle window close event - called automatically when closing the window"""
