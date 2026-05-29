@@ -53,3 +53,19 @@ def authorization_during_period(start_date: str, end_date: str):
     grouped = pd.concat([grouped, pd.DataFrame([{"country_name": "TOTAL", "user_type": "", "authorized_count": total}])])
 
     return grouped.to_dict(orient = "records")
+
+@app.get("/points_by_users_and_countries")
+def points_by_users_and_countries()
+    df = db.load_and_clean_users()
+
+    grouped = (df.groupby(["country_name", "user_type"])["points"].sum().reset_index(name="sum_points"))
+
+    total_points = grouped["sum_points"].sum()
+    total_row = pd.DataFrame([{
+            "country_name": "TOTAL",
+            "user_type": "",
+            "sum_points": total_points
+        }])
+    grouped = pd.concat([grouped, total_row], ignore_index=True)
+
+    return grouped

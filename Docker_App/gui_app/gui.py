@@ -348,19 +348,29 @@ class MainWindow(QMainWindow):
     @for_data_about_users
     def points_by_users_and_countries(self, df):
         """ Information about current sum of points by users and countries """
-    
-        grouped = (df.groupby(["country_name", "user_type"])["points"].sum().reset_index(name="sum_points"))
 
-        total_points = grouped["sum_points"].sum()
-        total_row = pd.DataFrame([{
-                "country_name": "TOTAL",
-                "user_type": "",
-                "sum_points": total_points
-            }])
-        grouped = pd.concat([grouped, total_row], ignore_index=True)
+        try:
+            logging.info("Sending request to FastAPI /points_by_users_and_countries endpoint...")
+            response = requests.get("http://localhost:8000/points_by_users_and_countries")
 
-        self.open_dataframe_in_excel(grouped)
-        QMessageBox.information(self, "Information", "Data about the current sum of points by type of users and countries has been generated.")
+            if response.status_code != 200:
+                logging.error("Server returned error %d: %s", response.status_code, response.text)
+                QMessageBox.warning(self, "Error!", f"Server error: {response.status_code}")
+                return None
+            
+            data = response.json()
+            df = pd.DataFrame(data)
+
+            if df.empty:
+                QMessageBox.warning(self, "Attention!", "Data about point by users and countries us empty.")
+                return None
+            
+            self.open_dataframe_in_excel(df)
+            logging.info("Information about points by users and countries has been generated and %d rows were returned.", len(df))
+            QMessageBox.information(self, "Information", "Information about points by users and countries has been generated.")        
+        except Exception as e:
+            logging.error("Failed to request points by users and countries.", exc_info = True)
+            QMessageBox.warning(self, "Error", "Failed to connect to server.")    
 
     @for_data_about_scans
     def all_scans(self, df):
