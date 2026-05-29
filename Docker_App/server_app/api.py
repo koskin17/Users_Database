@@ -70,3 +70,8 @@ def points_by_users_and_countries():
     grouped = pd.concat([grouped, total_row], ignore_index=True)
 
     return grouped.to_dict(orient = "records")
+
+@app.get("/all_scans")
+def all_scans():
+    df = db.load_data_about_scans()
+    return df.to_dict(orient = "records")
