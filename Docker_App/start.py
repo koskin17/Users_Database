@@ -8,6 +8,7 @@ load_dotenv()
 
 from gui_app.gui import MainWindow
 
+
 logging.basicConfig(
     filename=  "app.log",
     filemode = "a",
