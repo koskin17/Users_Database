@@ -184,25 +184,25 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Information", "Data about all users has been generated.")
 
     @for_data_about_users
-    def users_by_country(self, df):
+    def users_by_country(self, df_from_decorator):
         """General statistics about users by countries."""
 
-        logging.info("Method users_by_country was called and %d rows were returned.", len(df))
-        users_by_countries = df.groupby(["country_name", "user_type"]).size().reset_index(name='count')
+        logging.info("Method users_by_country was called and %d rows were returned.", len(df_from_decorator))
+        users_by_countries = df_from_decorator.groupby(["country_name", "user_type"]).size().reset_index(name='count')
         self.open_dataframe_in_excel(users_by_countries)
         QMessageBox.information(self, "Information", "Data about users by country has been generated.")
 
     @for_data_about_users
-    def last_authorization_in_app(self, df):
+    def last_authorization_in_app(self, df_from_decorator):
         """Quantity of authorized users by years with group by country and type of user"""
         
-        logging.info("Method last_authorization_in_app was called and %d rows were returned.", len(df))
+        logging.info("Method last_authorization_in_app was called and %d rows were returned.", len(df_from_decorator))
 
-        df["last_authorization"] = pd.to_datetime(df["last_authorization"], errors = "coerce")        
-        df["Year"] = df["last_authorization"].dt.year.fillna(0).astype(int)
+        df_from_decorator["last_authorization"] = pd.to_datetime(df_from_decorator["last_authorization"], errors = "coerce")        
+        df_from_decorator["Year"] = df_from_decorator["last_authorization"].dt.year.fillna(0).astype(int)
 
         df_grouped = (
-            df[df["Year"] != 0].groupby(["country_name", "user_type", "Year"]).size().reset_index(name="user_count")
+            df_from_decorator[df_from_decorator["Year"] != 0].groupby(["country_name", "user_type", "Year"]).size().reset_index(name="user_count")
         )
 
         pivot_df = df_grouped.pivot_table(
@@ -312,7 +312,7 @@ class MainWindow(QMainWindow):
             return None
 
     @for_data_about_users
-    def authorization_during_period(self, df):
+    def authorization_during_period(self, df_from_decorator):
         """Information about the amount of authorized users for the period"""
         
         start_date = self.parse_date("Period start:", "Enter the period start in dd.mm.yyyy (separated by dot):")
@@ -330,28 +330,28 @@ class MainWindow(QMainWindow):
             logging.error("End date is greated or equals start date. Authorization during period cannot be calculated.", exc_info = True)
             return None
         
-        try:
-            response = requests.get("http://localhost:8000/authorization_during_period",
-                                    params = {"start_date": start_date.strftime("%d.%m.%Y"), "end_date": end_date.strftime("%d.%m.%Y")})
-            if response.status_code != 200:
-                logging.error("Server returned error %d: %s", response.status_code, response.text)
-                QMessageBox.warning(self, "Error!", f"Server error: {response.status_code}")
-                return None
+        # try:
+        #     response = requests.get("http://localhost:8000/authorization_during_period",
+        #                             params = {"start_date": start_date.strftime("%d.%m.%Y"), "end_date": end_date.strftime("%d.%m.%Y")})
+        #     if response.status_code != 200:
+        #         logging.error("Server returned error %d: %s", response.status_code, response.text)
+        #         QMessageBox.warning(self, "Error!", f"Server error: {response.status_code}")
+        #         return None
             
-            data = response.json()
-            df = pd.DataFrame(data)
+        #     data = response.json()
+        df = pd.DataFrame(df_from_decorator)
 
-            if df.empty:
-                QMessageBox.warning(self, "Attention!", "No authorized users found for the selected period.")
-                return None
+        if df.empty:
+            QMessageBox.warning(self, "Attention!", "No authorized users found for the selected period.")
+            return None
             
-            self.open_dataframe_in_excel(df)
-            logging.info("Authorization during period data generated (%d rows).", len(df))
-            QMessageBox.information(self, "Information", "Information of the number of authorized users for the period has been generated.")
+        self.open_dataframe_in_excel(df)
+        logging.info("Authorization during period data generated (%d rows).", len(df))
+        QMessageBox.information(self, "Information", "Information of the number of authorized users for the period has been generated.")
 
-        except Exception as e:
-            logging.error("Failed to request authorization during period", exc_info = True)
-            QMessageBox.warning(self, "Error", "Failed to connect to server.")
+        # except Exception as e:
+        #     logging.error("Failed to request authorization during period", exc_info = True)
+        #     QMessageBox.warning(self, "Error", "Failed to connect to server.")
 
     @for_data_about_users
     def points_by_users_and_countries(self, df_from_decorator):
