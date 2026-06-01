@@ -3,9 +3,9 @@ import os
 import logging
 
 import pandas as pd
-from datetime import datetime
 
 from psycopg2.pool import SimpleConnectionPool
+
 
 class DatabaseService:
 
