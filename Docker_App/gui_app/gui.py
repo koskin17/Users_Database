@@ -354,20 +354,21 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Error", "Failed to connect to server.")
 
     @for_data_about_users
-    def points_by_users_and_countries(self, df):
+    def points_by_users_and_countries(self, df_from_decorator):
         """ Information about current sum of points by users and countries """
 
         try:
-            logging.info("Sending request to FastAPI /points_by_users_and_countries endpoint...")
-            response = requests.get("http://localhost:8000/points_by_users_and_countries")
+            logging.info("Receiving DataFrame from decorator with cleared users")
+            # logging.info("Sending request to FastAPI /points_by_users_and_countries endpoint...")
+            # response = requests.get("http://localhost:8000/points_by_users_and_countries")
 
-            if response.status_code != 200:
-                logging.error("Server returned error %d: %s", response.status_code, response.text, exc_info = True)
-                QMessageBox.warning(self, "Error!", f"Server error: {response.status_code}")
-                return None
+            # if response.status_code != 200:
+            #     logging.error("Server returned error %d: %s", response.status_code, response.text, exc_info = True)
+            #     QMessageBox.warning(self, "Error!", f"Server error: {response.status_code}")
+            #     return None
             
-            data = response.json()
-            df = pd.DataFrame(data)
+            # data = response.json()
+            df = pd.DataFrame(df_from_decorator)
 
             if df.empty:
                 QMessageBox.warning(self, "Attention!", "Data about point by users and countries us empty.")
