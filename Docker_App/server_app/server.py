@@ -7,9 +7,6 @@ from datetime import datetime
 
 from psycopg2.pool import SimpleConnectionPool
 
-print("DB_USER", os.getenv("DB_USER"))  #TODO delete after testing
-print("DB_PASSWORD", os.getenv("DB_PASSWORD"))  #TODO delete after testing
-
 class DatabaseService:
 
     def __init__(self):
@@ -331,4 +328,4 @@ class DatabaseService:
                 self.db_pool.closeall()
                 logging.info("Database connection pool closed successfully")
             except Exception as e:
-                logging.error("Erro closing database connection pool", exc_info = True)
+                logging.error("Error closing database connection pool", exc_info = True)
