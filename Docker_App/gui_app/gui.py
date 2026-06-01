@@ -160,7 +160,7 @@ class MainWindow(QMainWindow):
 
         if df is None or df.empty:
             QMessageBox.warning(self, "Attention!", "DataFrame is empty.")
-            return pd.DataFrame()
+            return
         
         try:
             with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
@@ -238,7 +238,7 @@ class MainWindow(QMainWindow):
                 return None
             
             self.open_dataframe_in_excel(df)
-            logging.info("Data about scanned users by year has been generated and %d rows were returned.")
+            logging.info("Data about scanned users by year has been generated and %d rows were returned.", len(df))
             QMessageBox.information(self, "Information", "Data about scanned users by year has been generated.")
         except Exception as e:
             logging.error("Failed to request scanned users by year", exc_info = True)
