@@ -6,11 +6,18 @@ import pandas as pd
 from dotenv import load_dotenv
 import os
 
+from contextlib import asynccontextmanager
+
 
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
 load_dotenv(env_path)
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    db.close_db_connection()
+    
+app = FastAPI(lifespan = lifespan)
 db = DatabaseService()
 
 @app.get("/")
@@ -25,21 +32,41 @@ def get_users():
 @app.get("/scanned_users_by_year")
 def get_scanned_users_by_year():
     df = db.scanned_users_by_year()
-    return df.to_dict(orient = "records")
+    optimized_df = df.copy()
+    for col in optimized_df.select_dtypes(include=['datetime64[ns]','datetime64']).columns:
+        optimized_df[col] = optimized_df[col].dt.strftime('%Y-%m-%dT%H:%M:%S')
+        
+    return optimized_df.where(pd.notnull(optimized_df), None).to_dict(orient='records')
 
 @app.get("/scans_products_by_year")
 def scans_products_by_year():
     df = db.scans_products_by_year()
-    return df.to_dict(orient="records")
+    optimized_df = df.copy()
+    for col in optimized_df.select_dtypes(include=['datetime64[ns]','datetime64']).columns:
+        optimized_df[col] = optimized_df[col].dt.strftime('%Y-%m-%dT%H:%M:%S')
+        
+    return optimized_df.where(pd.notnull(optimized_df), None).to_dict(orient='records')
 
 @app.get("/top_users_by_scans")
 def top_users_by_scans():
     df = db.top_users_by_scans()
-    return df.to_dict(orient="records")
+    optimized_df = df.copy()
+    for col in optimized_df.select_dtypes(include=['datetime64[ns]','datetime64']).columns:
+        optimized_df[col] = optimized_df[col].dt.strftime('%Y-%m-%dT%H:%M:%S')
+        
+    return optimized_df.where(pd.notnull(optimized_df), None).to_dict(orient='records')
 
 @app.get("/authorization_during_period")
 def authorization_during_period(start_date: str, end_date: str):
     df = db.load_and_clean_users()
+    
+    optimized_df = df.copy()
+    for col in optimized_df.select_dtypes(include=['datetime64[ns]','datetime64']).columns:
+        optimized_df[col] = optimized_df[col].dt.strftime('%Y-%m-%dT%H:%M:%S')
+    
+    
+    df = optimized_df.where(pd.notnull(optimized_df), None).to_dict(orient='records')
+
     df["last_authorization"] = pd.to_datetime(df["last_authorization"], errors = "coerce")
 
     start = datetime.strptime(start_date, "%d.%m.%Y")
@@ -82,8 +109,12 @@ def all_scans():
 @app.get("/data_about_scans_during_period")
 def data_about_scans_during_period(start_date: str, end_date: str):
     df = db.load_data_about_scans()
+    
+    optimized_df = df.copy()
+    for col in optimized_df.select_dtypes(include=['datetime64[ns]','datetime64']).columns:
+        optimized_df[col] = optimized_df[col].dt.strftime('%Y-%m-%dT%H:%M:%S')
 
-    df["created_at"] = pd.to_datetime(df["created_at"], errors = "coerce")
+    df["created_at"] = pd.to_datetime(optimized_df["created_at"], errors = "coerce")
 
     start = datetime.strptime(start_date, "%d.%m.%Y")
     end = datetime.strptime(end_date, "%d.%m.%Y")
@@ -93,5 +124,3 @@ def data_about_scans_during_period(start_date: str, end_date: str):
     df_data_about_scans_during_period = df[mask]
 
     return df_data_about_scans_during_period.to_dict(orient = "records")
-
-
