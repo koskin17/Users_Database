@@ -273,7 +273,7 @@ class MainWindow(QMainWindow):
 
         try:
             logging.info("Sending request to FastAPI /top_users_by_scans endpoint...")
-            response = requests.get("http:localhost:8000/top_users_by_scans")
+            response = requests.get("http://localhost:8000/top_users_by_scans")
 
             if response.status_code != 200:
                 logging.error("Server returned error %d: %s", response.status_code, response.text)
@@ -414,7 +414,7 @@ class MainWindow(QMainWindow):
             response = requests.get("http://localhost:8000/data_about_scans_during_period", params = {"start_date": start_date.strftime("%d.%m.%Y"), "end_date": end_date.strftime("%d.%m.%Y")})
 
             if response.status_code != 200:
-                logging.error("Server retured error %d: %s", response.status_code, response.text? exc_info = True)
+                logging.error("Server retured error %d: %s", response.status_code, response.text, exc_info = True)
                 QMessageBox.warning(self, "Error!", f"Servet error: {response.status_code}")
                 return None
             
