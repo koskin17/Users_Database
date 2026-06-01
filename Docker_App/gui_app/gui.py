@@ -25,10 +25,14 @@ def for_data_about_users(func):
         try:
             logging.info("Sending request to FastAPI /users endpoint...")
             response = requests.get(f"{API_BASE}/users")
+            if response.status_code != 200:
+                logging.error("Server returned error %d for /users: %s", response.status_code, response.text, exc_info = True)
+                QMessageBox.warning(self, "Error", f"Server error: {response.status_code}")
+                return pd.DataFrame()
             data = response.json()
             df = pd.DataFrame(data)
         except Exception as e:
-            logging.error("Failed to request /users endpoint", exc_info = True)
+            logging.error("Failed to request /users endpoint", response.status_code, response.text,exc_info = True)
             QMessageBox.warning(self, "Error", "Failed to connect to server.")
             return pd.DataFrame()
 
@@ -57,10 +61,18 @@ def for_data_about_scans(func):
         try:
             logging.info("Sending request to FastAPI /all_scans endpoint...")
             response = requests.get(f"{API_BASE}/all_scans")
+            
+            if response.status_code != 200:
+                logging.error("Server returned error %d for /all_scans: %s", response.status_code, response.text, exc_info = True)
+                QMessageBox.warning(self, "Error", f"Server error: {response.status_code}")
+                return pd.DataFrame()
+            
             data = response.json()
             df = pd.DataFrame(data)
+            
         except Exception as e:
-            logging.error("Failed to request /all_scans endpoint", exc_info = True)
+            
+            logging.error("Failed to request /all_scans endpoint", response.status_code, response.text, exc_info = True)
             QMessageBox.warning(self, "Error", "Failed to connect to server.")
             return pd.DataFrame()
 

@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from server_app.server import DatabaseService
 from datetime import datetime
 import pandas as pd
+import numpy as np
 
 from dotenv import load_dotenv
 import os
@@ -12,8 +13,11 @@ def df_to_json_records(df: pd.DataFrame):
     optimized_date_df = df.copy()
     for col in optimized_date_df.select_dtypes(include=['datetime64[ns]', 'datetime64']).columns:
         optimized_date_df[col] = optimized_date_df[col].dt.strftime('%Y-%m-%dT%H:%M:%S')
+
+    optimized_date_df = optimized_date_df.astype(object).where(pd.notnull(optimized_date_df), None)
+    optimized_date_df = optimized_date_df.replace({np.nan: None})
     
-    return optimized_date_df.where(pd.notnull(optimized_date_df), None).to_dict(orient='records')
+    return optimized_date_df.to_dict(orient='records')
 
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
 load_dotenv(env_path)
@@ -75,7 +79,7 @@ def authorization_during_period(start_date: str, end_date: str):
         ignore_index=True,
     )
     
-    return grouped.where(pd.notnull(grouped), None).to_dict(orient="records")
+    return df_to_json_records(grouped)
 
 @app.get("/points_by_users_and_countries")
 def points_by_users_and_countries():
@@ -92,7 +96,7 @@ def points_by_users_and_countries():
         }])
     grouped = pd.concat([grouped, total_row], ignore_index=True)
 
-    return grouped.to_dict(orient = "records")
+    return df_to_json_records(grouped)
 
 @app.get("/all_scans")
 def all_scans():
@@ -114,4 +118,4 @@ def data_about_scans_during_period(start_date: str, end_date: str):
     for col in df_period.select_dtypes(include=['datetime64[ns]','datetime64']).columns:
         df_period[col] = df_period[col].dt.strftime('%Y-%m-%dT%H:%M:%S')
     
-    return df_period.where(pd.notnull(df_period), None).to_dict(orient="records")
+    return df_to_json_records(df_period)
