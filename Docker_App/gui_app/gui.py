@@ -22,6 +22,8 @@ logging.basicConfig(
     level = logging.INFO
 )
 
+API_BASE = "http://localhost:8000"
+
 def for_data_about_users(func):
     """Decorator for loading and cleaning data about users"""
 
@@ -221,7 +223,7 @@ class MainWindow(QMainWindow):
 
         try:
             logging.info("Sending request to FastAPI /scanned_users_by_year endpoint...")
-            response = requests.get("http://localhost:8000/scanned_users_by_year")
+            response = requests.get(f"{API_BASE}/scanned_users_by_year")
 
             if response.status_code != 200:
                 logging.error("Server returned error %d: %s", response.status_code, response.text)
@@ -247,7 +249,7 @@ class MainWindow(QMainWindow):
 
         try:
             logging.info("Sending request to FastAPI /scans_products_by_year endpoint...")
-            response = requests.get("http://localhost:8000/scans_products_by_year")
+            response = requests.get(f"{API_BASE}/scans_products_by_year")
 
             if response.status_code != 200:
                logging.error("Server returned error %d: %s", response.status_code, response.text)
@@ -273,7 +275,7 @@ class MainWindow(QMainWindow):
 
         try:
             logging.info("Sending request to FastAPI /top_users_by_scans endpoint...")
-            response = requests.get("http://localhost:8000/top_users_by_scans")
+            response = requests.get(f"{API_BASE}/top_users_by_scans")
 
             if response.status_code != 200:
                 logging.error("Server returned error %d: %s", response.status_code, response.text)
@@ -293,10 +295,6 @@ class MainWindow(QMainWindow):
         except Exception as e:
             logging.error("Failed to request TOP users by scans", exc_info = True)
             QMessageBox.warning(self, "Error!", "Failed to connect to server.")
-
-
-        # df_top_users = self.data_service.top_users_by_scans()
-        # self.open_dataframe_in_excel(df_top_users)
         
     def parse_date(self, prompt_title, prompt_text):
         """Helper to parse date from user input"""
@@ -330,7 +328,7 @@ class MainWindow(QMainWindow):
             return None
         
         try:
-            response = requests.get("http://localhost:8000/authorization_during_period",
+            response = requests.get(f"{API_BASE}/authorization_during_period",
                                     params = {"start_date": start_date.strftime("%d.%m.%Y"), "end_date": end_date.strftime("%d.%m.%Y")})
             if response.status_code != 200:
                 logging.error("Server returned error %d: %s", response.status_code, response.text)
@@ -358,7 +356,7 @@ class MainWindow(QMainWindow):
         try:
             logging.info("Receiving DataFrame from decorator with cleared users")
             logging.info("Sending request to FastAPI /points_by_users_and_countries endpoint...")
-            response = requests.get("http://localhost:8000/points_by_users_and_countries")
+            response = requests.get(f"{API_BASE}/points_by_users_and_countries")
 
             if response.status_code != 200:
                 logging.error("Server returned error %d: %s", response.status_code, response.text, exc_info = True)
@@ -409,7 +407,7 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            response = requests.get("http://localhost:8000/data_about_scans_during_period", params = {"start_date": start_date.strftime("%d.%m.%Y"), "end_date": end_date.strftime("%d.%m.%Y")})
+            response = requests.get(f"{API_BASE}/data_about_scans_during_period", params = {"start_date": start_date.strftime("%d.%m.%Y"), "end_date": end_date.strftime("%d.%m.%Y")})
 
             if response.status_code != 200:
                 logging.error("Server retured error %d: %s", response.status_code, response.text, exc_info = True)
