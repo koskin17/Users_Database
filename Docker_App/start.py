@@ -6,15 +6,15 @@ import logging
 
 load_dotenv()
 
-from gui_app.gui import MainWindow
-
-
 logging.basicConfig(
     filename=  "app.log",
     filemode = "a",
     format = "%(asctime)s - %(levelname)s - %(message)s",
     level = logging.INFO
 )
+
+from gui_app.gui import MainWindow
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
