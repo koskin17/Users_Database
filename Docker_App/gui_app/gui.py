@@ -13,14 +13,6 @@ from functools import wraps
 from PyQt5.QtWidgets import QMainWindow, QLabel, QPushButton, QMessageBox, QInputDialog, QWidget, QVBoxLayout
 from PyQt5.QtGui import QIcon, QPixmap, QFont
 
-import logging
-
-logging.basicConfig(
-    filename=  "app.log",
-    filemode = "a",
-    format = "%(asctime)s - %(levelname)s - %(message)s",
-    level = logging.INFO
-)
 
 API_BASE = "http://localhost:8000"
 
@@ -32,7 +24,7 @@ def for_data_about_users(func):
 
         try:
             logging.info("Sending request to FastAPI /users endpoint...")
-            response = requests.get("http://localhost:8000/users")
+            response = requests.get(f"{API_BASE}/users")
             data = response.json()
             df = pd.DataFrame(data)
         except Exception as e:
@@ -64,7 +56,7 @@ def for_data_about_scans(func):
 
         try:
             logging.info("Sending request to FastAPI /all_scans endpoint...")
-            response = requests.get("http://localhost:8000/all_scans")
+            response = requests.get(f"{API_BASE}/all_scans")
             data = response.json()
             df = pd.DataFrame(data)
         except Exception as e:
@@ -308,8 +300,8 @@ class MainWindow(QMainWindow):
             logging.error("Invalid date format entered by user", exc_info = True)
             QMessageBox.warning(self, "Attention!", "The entered date is incorrect! Format: dd.mm.yyyy")
             return None
-
-    def authorization_during_period(self, df):
+        
+    def authorization_during_period(self):
         """Information about the amount of authorized users for the period"""
         
         start_date = self.parse_date("Period start:", "Enter the period start in dd.mm.yyyy (separated by dot):")
@@ -350,11 +342,10 @@ class MainWindow(QMainWindow):
             logging.error("Failed to request authorization during period", exc_info = True)
             QMessageBox.warning(self, "Error", "Failed to connect to server.")
 
-    def points_by_users_and_countries(self, df):
+    def points_by_users_and_countries(self):
         """ Information about current sum of points by users and countries """
 
         try:
-            logging.info("Receiving DataFrame from decorator with cleared users")
             logging.info("Sending request to FastAPI /points_by_users_and_countries endpoint...")
             response = requests.get(f"{API_BASE}/points_by_users_and_countries")
 
@@ -364,12 +355,12 @@ class MainWindow(QMainWindow):
                 return None
             
             data = response.json()
-            df = pd.DataFrame(df)
+            df = pd.DataFrame(data)
 
             if df.empty:
                 QMessageBox.warning(self, "Attention!", "Data about point by users and countries us empty.")
                 return None
-            
+                
             self.open_dataframe_in_excel(df)
             logging.info("Information about points by users and countries has been generated and %d rows were returned.", len(df))
             QMessageBox.information(self, "Information", "Information about points by users and countries has been generated.")        
@@ -382,7 +373,7 @@ class MainWindow(QMainWindow):
         """Information about all scans in the database"""
         self.open_dataframe_in_excel(df_from_decorator)
 
-    def data_about_scans_during_period(self, df_from_decorator):
+    def data_about_scans_during_period(self):
         """Data about number of users and scans during period"""
 
         start_date = self.parse_date(
@@ -410,8 +401,8 @@ class MainWindow(QMainWindow):
             response = requests.get(f"{API_BASE}/data_about_scans_during_period", params = {"start_date": start_date.strftime("%d.%m.%Y"), "end_date": end_date.strftime("%d.%m.%Y")})
 
             if response.status_code != 200:
-                logging.error("Server retured error %d: %s", response.status_code, response.text, exc_info = True)
-                QMessageBox.warning(self, "Error!", f"Servet error: {response.status_code}")
+                logging.error("Server returned error %d: %s", response.status_code, response.text, exc_info = True)
+                QMessageBox.warning(self, "Error!", f"Server error: {response.status_code}")
                 return None
             
             data = response.json()
